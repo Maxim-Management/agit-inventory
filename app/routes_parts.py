@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from . import db
 from .auth import login_required, roles_required
 from .stock import stock_map, part_stock_value, avg_exchange_rate_all_receipts, guaranteed_resource_hours
-from .costing import part_unit_cost_rub
+from .costing import unit_cost_rub
 
 bp = Blueprint("parts", __name__, url_prefix="/parts")
 
@@ -169,10 +169,26 @@ def detail(part_id):
         return redirect(url_for("parts.list_parts"))
 
     part["current_stock"] = stock_map().get(part_id, 0)
-    part["unit_cost_rub"] = part_unit_cost_rub(part)
     part["stock_value"] = part_stock_value(part_id)
-    part["avg_exchange_rate_receipts"] = avg_exchange_rate_all_receipts(part_id)
     part["guaranteed_resource_hours"] = guaranteed_resource_hours(part_id)
+
+    # «Стоимость за единицу» на карточке детали считается по СРЕДНЕМУ курсу
+    # юаня по всем поступлениям этой детали (avg_exchange_rate_all_receipts),
+    # а не по курсу самого последнего поступления (part.exchange_rate,
+    # по-прежнему используется как есть в других расчётах — стоимость
+    # списаний на работу, app/jobs.py). Пошлина, как и раньше, берётся из
+    # самой карточки детали (parts.customs_duty_percent) — она не зависит от
+    # партии. Если поступлений с указанным курсом ещё не было, используется
+    # "текущий" курс из карточки детали как запасной вариант.
+    avg_exchange_rate = avg_exchange_rate_all_receipts(part_id)
+    part["avg_exchange_rate_receipts"] = avg_exchange_rate
+    part["unit_cost_exchange_rate"] = avg_exchange_rate if avg_exchange_rate is not None else part.get("exchange_rate")
+    part["unit_cost_rub"] = unit_cost_rub(
+        part.get("standard_cost_cny"),
+        part["unit_cost_exchange_rate"],
+        part.get("customs_duty_percent"),
+        part.get("unit_transfer_price_rub"),
+    )
 
     units = db.query_all(
         "SELECT * FROM units WHERE part_id = %s ORDER BY status, serial_number", [part_id]
