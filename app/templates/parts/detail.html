@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}{{ part.part_name }} — AGIT tool and components track{% endblock %}
+{% block content %}
+<a href="{{ url_for('parts.list_parts') }}" class="text-sm text-blue-700 hover:underline">&larr; К справочнику</a>
+<div class="flex items-start justify-between mt-2 mb-1">
+  <div>
+    <h1 class="text-2xl font-semibold">{{ part.part_name }}</h1>
+    <p class="text-sm text-slate-500">№ {{ part.part_number }} · {{ part.tool_size }} · {{ part.specification }}</p>
+  </div>
+  {% if can_edit %}
+  <a href="{{ url_for('parts.edit_part', part_id=part.id) }}" class="text-sm text-blue-700 hover:underline">Редактировать</a>
+  {% endif %}
+</div>
+
+<div class="grid md:grid-cols-3 gap-4 mb-4 mt-4">
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Текущий остаток</div>
+    <div class="text-2xl font-semibold {{ 'text-red-600' if part.current_stock < part.min_stock_qty }}">{{ part.current_stock|num }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Способ учёта</div>
+    <div class="text-lg font-medium mt-1">{{ 'По серийным номерам' if part.is_serialized else 'По количеству' }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Мин. неснижаемый остаток</div>
+    <div class="text-2xl font-semibold">{{ part.min_stock_qty }}</div>
+  </div>
+</div>
+
+<div class="grid md:grid-cols-2 gap-4 mb-6">
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Стоимость остатка (по партиям на складе), ₽</div>
+    <div class="text-2xl font-semibold text-blue-700">{{ part.stock_value.stock_value_rub|num }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Курс юаня, средневзв. по остатку</div>
+    <div class="text-2xl font-semibold">{{ part.stock_value.avg_exchange_rate|num(4) if part.stock_value.avg_exchange_rate is not none else '—' }}</div>
+  </div>
+</div>
+{% if part.stock_value.valued_qty < part.current_stock %}
+<p class="text-xs text-amber-600 -mt-4 mb-6">Оценено {{ part.stock_value.valued_qty|num }} из {{ part.current_stock|num }} ед. остатка — для остального неизвестна партия поступления (исторические данные без указанного поступления), в стоимость остатка не включено.</p>
+{% endif %}
+
+<div class="bg-white border border-slate-200 rounded-xl p-5 mb-6">
+  <div class="flex items-baseline justify-between mb-3">
+    <h2 class="font-semibold">Стоимость за единицу</h2>
+    <div class="text-2xl font-semibold text-blue-700">{{ part.unit_cost_rub|num }} ₽</div>
+  </div>
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+    <div>
+      <div class="text-xs text-slate-500">Себестоимость, CNY</div>
+      <div class="font-medium">{{ part.standard_cost_cny|num if part.standard_cost_cny is not none else '—' }}</div>
+    </div>
+    <div>
+      <div class="text-xs text-slate-500">Курс юаня к рублю</div>
+      <div class="font-medium">{{ part.exchange_rate|num if part.exchange_rate is not none else '—' }}</div>
+      {% if part.avg_exchange_rate_receipts is not none %}
+      <div class="text-xs text-slate-400 mt-0.5">справочно, средний по поступлениям: {{ part.avg_exchange_rate_receipts|num(4) }}</div>
+      {% endif %}
+    </div>
+    <div>
+      <div class="text-xs text-slate-500">Пошлина, %</div>
+      <div class="font-medium">{{ part.customs_duty_percent|num if part.customs_duty_percent is not none else '—' }}</div>
+    </div>
+    <div>
+      <div class="text-xs text-slate-500">Трансфер прайс, ₽</div>
+      <div class="font-medium">{{ part.unit_transfer_price_rub|num if part.unit_transfer_price_rub is not none else '—' }}</div>
+    </div>
+  </div>
+  <p class="text-xs text-slate-400 mt-3">Стоимость за единицу = себестоимость × курс × (1 + пошлина) + трансфер прайс. Себестоимость, курс и трансфер прайс — по самому свежему поступлению этой детали (обновляются автоматически при регистрации нового поступления или правятся вручную в редактировании детали); «средний по поступлениям» под курсом — справочная величина (простое среднее по всем поступлениям этой детали), в самом расчёте не участвует. Пошлина — атрибут самой позиции, одна и та же для всех партий; поступления её не меняют, править можно только в редактировании детали.</p>
+</div>
+
+{% if part.is_serialized %}
+<div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-slate-500 text-left">
+    <tr>
+      <th class="px-4 py-2">Серийный №</th>
+      <th class="px-4 py-2">Статус</th>
+      <th class="px-4 py-2">Дата изг.</th>
+      <th class="px-4 py-2">Наработка, ч</th>
+      <th class="px-4 py-2">Обслуж., раз</th>
+      <th class="px-4 py-2">OD/ID, мм</th>
+      <th class="px-4 py-2">Установлен на</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in units %}
+    <tr class="border-t border-slate-100 hover:bg-slate-50">
+      <td class="px-4 py-2"><a href="{{ url_for('units.detail', unit_id=u.id) }}" class="text-blue-700 hover:underline">{{ u.serial_number }}</a></td>
+      <td class="px-4 py-2"><span class="px-2 py-0.5 rounded text-xs status-{{ u.status }}">{{ u.status }}</span></td>
+      <td class="px-4 py-2 text-slate-500">{{ u.date_mfg }}</td>
+      <td class="px-4 py-2">{{ u.circulation_hours|num }}</td>
+      <td class="px-4 py-2">{{ u.service_count }}</td>
+      <td class="px-4 py-2">{{ u.od_mm|num if u.od_mm else (u.id_mm|num if u.id_mm else '—') }}</td>
+      <td class="px-4 py-2 text-slate-500">{{ u.installed_on }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">Серийные единицы не зарегистрированы.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<div class="flex gap-3 mb-4">
+  {% if can_edit %}
+  <a href="{{ url_for('receipts.new_receipt') }}" class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm hover:bg-slate-200">+ Поступление</a>
+  <a href="{{ url_for('writeoffs.new_bulk_writeoff', part_id=part.id) }}" class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm hover:bg-slate-200">+ Списание</a>
+  {% endif %}
+</div>
+<div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-slate-500 text-left">
+    <tr><th class="px-4 py-2">Дата</th><th class="px-4 py-2">Операция</th><th class="px-4 py-2 text-right">Кол-во</th><th class="px-4 py-2">Детали</th></tr>
+  </thead>
+  <tbody>
+    {% for l in ledger %}
+    <tr class="border-t border-slate-100">
+      <td class="px-4 py-2">{{ l.date }}</td>
+      <td class="px-4 py-2">{{ l.kind }}</td>
+      <td class="px-4 py-2 text-right {{ 'text-green-700' if l.qty > 0 else 'text-red-600' }}">{{ '+' if l.qty > 0 }}{{ l.qty|num }}</td>
+      <td class="px-4 py-2 text-slate-500">{{ l.detail }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" class="px-4 py-6 text-center text-slate-400">Движений пока нет.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+{% endblock %}

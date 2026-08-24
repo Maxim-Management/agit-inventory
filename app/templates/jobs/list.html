@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Ремонтные работы — AGIT tool and components track{% endblock %}
+{% block content %}
+
+<div class="mb-4">
+  <h1 class="text-2xl font-semibold">Сервис</h1>
+  <div class="flex gap-4 text-sm text-slate-500 mt-2">
+    <span class="font-medium text-slate-900 border-b-2 border-slate-900 pb-1">Работы и затраты</span>
+    <a href="{{ url_for('pairing.index') }}" class="hover:text-slate-900 pb-1">Подбор пар</a>
+  </div>
+</div>
+<div class="flex items-center justify-between mb-6">
+  <h2 class="text-lg font-semibold text-slate-700">Ремонтные / сборочные работы</h2>
+  <div class="flex gap-2">
+    <a href="{{ url_for('jobs.report') }}" class="bg-slate-100 border border-slate-300 text-sm px-4 py-2 rounded-lg hover:bg-slate-200">Отчёт по затратам</a>
+    {% if can_edit %}
+    <a href="{{ url_for('jobs.new_job') }}" class="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800">+ Новая работа</a>
+    {% endif %}
+  </div>
+</div>
+
+<form method="get" class="flex flex-wrap gap-3 mb-6">
+  <select name="job_type" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+    <option value="">Все типы</option>
+    {% for k, v in job_type_labels.items() %}
+    <option value="{{ k }}" {{ 'selected' if job_type==k }}>{{ v }}</option>
+    {% endfor %}
+  </select>
+  <input type="date" name="date_from" value="{{ date_from or '' }}" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  <input type="date" name="date_to" value="{{ date_to or '' }}" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  <button class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm">Фильтр</button>
+</form>
+
+<p class="text-sm text-slate-500 mb-4">Суммарная стоимость по выбранным работам: <span class="font-semibold text-slate-800">{{ grand_total|num }} ₽</span></p>
+
+<div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-slate-500 text-left">
+    <tr>
+      <th class="px-4 py-2">Дата</th><th class="px-4 py-2">Тип</th><th class="px-4 py-2">Наряд-заказ №</th>
+      <th class="px-4 py-2">Инструмент</th><th class="px-4 py-2">Название</th>
+      <th class="px-4 py-2 text-right">Детали, ₽</th><th class="px-4 py-2 text-right">Сервис, ₽</th>
+      <th class="px-4 py-2 text-right">Персонал, ₽</th><th class="px-4 py-2 text-right">Прочее, ₽</th>
+      <th class="px-4 py-2 text-right font-semibold">Итого, ₽</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for j in jobs %}
+    <tr class="border-t border-slate-100 hover:bg-slate-50">
+      <td class="px-4 py-2"><a href="{{ url_for('jobs.detail', job_id=j.id) }}" class="text-blue-700 hover:underline">{{ j.job_date }}</a></td>
+      <td class="px-4 py-2">{{ job_type_labels.get(j.job_type, j.job_type) }}</td>
+      <td class="px-4 py-2 text-slate-500">{{ j.work_order_number or '—' }}</td>
+      <td class="px-4 py-2 text-slate-500">{% if j.tool_serial %}<a href="{{ url_for('tools.detail', tool_id=j.tool_id) }}" class="text-blue-700 hover:underline">{{ j.tool_serial }}</a>{% else %}—{% endif %}</td>
+      <td class="px-4 py-2 text-slate-500">{{ j.title or '—' }}</td>
+      <td class="px-4 py-2 text-right">{{ j.parts_cost|num }}</td>
+      <td class="px-4 py-2 text-right">{{ j.service_center_cost|num }}</td>
+      <td class="px-4 py-2 text-right">{{ j.labor_cost|num }}</td>
+      <td class="px-4 py-2 text-right">{{ j.other_cost|num }}</td>
+      <td class="px-4 py-2 text-right font-semibold">{{ j.total_cost|num }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="10" class="px-4 py-6 text-center text-slate-400">Работ пока нет.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

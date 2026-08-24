@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Аналитика списаний — AGIT tool and components track{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <h1 class="text-2xl font-semibold">Аналитика</h1>
+  <div class="flex gap-4 text-sm text-slate-500 mt-2">
+    <span class="font-medium text-slate-900 border-b-2 border-slate-900 pb-1">Списания по периодам</span>
+    <a href="{{ url_for('analytics.report') }}" class="hover:text-slate-900 pb-1">Сводный отчёт</a>
+  </div>
+</div>
+<p class="text-sm text-slate-500 mb-6">Всего списаний за выбранный период: {{ data.total_writeoffs }}</p>
+
+<form method="get" class="flex flex-wrap items-end gap-3 mb-8">
+  <div>
+    <label class="block text-xs text-slate-500 mb-1">Группировка</label>
+    <select name="granularity" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      <option value="month" {{ 'selected' if granularity=='month' }}>По месяцам</option>
+      <option value="quarter" {{ 'selected' if granularity=='quarter' }}>По кварталам</option>
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs text-slate-500 mb-1">Глубина, мес.</label>
+    <input type="number" name="months_back" value="{{ months_back }}" class="border border-slate-300 rounded-lg px-3 py-2 text-sm w-24">
+  </div>
+  <div>
+    <label class="block text-xs text-slate-500 mb-1">Деталь</label>
+    <select name="part_id" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      <option value="">Все</option>
+      {% for p in parts %}
+      <option value="{{ p.id }}" {{ 'selected' if part_id==p.id|string }}>{{ p.part_name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs text-slate-500 mb-1">Типоразмер</label>
+    <select name="tool_size" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      <option value="">Все</option>
+      {% for ts in tool_sizes %}
+      <option value="{{ ts }}" {{ 'selected' if ts==tool_size }}>{{ ts }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <button class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm">Применить</button>
+</form>
+
+<div class="bg-white border border-slate-200 rounded-xl p-5 mb-8">
+  <h2 class="font-semibold mb-3">Списания по периодам и причинам</h2>
+  {% if data.periods %}
+  <canvas id="periodChart" height="90"></canvas>
+  {% else %}
+  <p class="text-sm text-slate-400">Нет данных за выбранный период.</p>
+  {% endif %}
+</div>
+
+<h2 class="font-semibold mb-3">Расход по деталям</h2>
+<div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-slate-500 text-left">
+    <tr>
+      <th class="px-4 py-2">Деталь</th>
+      {% for p in data.periods %}<th class="px-4 py-2 text-right">{{ p }}</th>{% endfor %}
+      <th class="px-4 py-2 text-right font-semibold">Итого</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in data.part_table %}
+    <tr class="border-t border-slate-100 hover:bg-slate-50">
+      <td class="px-4 py-2">{{ row.part }}</td>
+      {% for c in row.counts %}<td class="px-4 py-2 text-right">{{ c }}</td>{% endfor %}
+      <td class="px-4 py-2 text-right font-medium">{{ row.total }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="10" class="px-4 py-6 text-center text-slate-400">Нет данных.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if data.periods %}
+<script>
+  new Chart(document.getElementById('periodChart'), {
+    type: 'bar',
+    data: {
+      labels: {{ data.periods|tojson }},
+      datasets: [
+        { label: 'Ремонт', data: {{ data.reason_series.repair|tojson }}, backgroundColor: '#2a78d6' },
+        { label: 'Брак', data: {{ data.reason_series.defect|tojson }}, backgroundColor: '#eb6834' },
+        { label: 'Повреждение', data: {{ data.reason_series.damage|tojson }}, backgroundColor: '#1baf7a' },
+        { label: 'Другое', data: {{ data.reason_series.other|tojson }}, backgroundColor: '#eda100' },
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, beginAtZero: true, grid: { color: '#f0efec' } }
+      },
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}

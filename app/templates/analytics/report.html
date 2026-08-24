@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Сводный отчёт — AGIT tool and components track{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <h1 class="text-2xl font-semibold">Аналитика</h1>
+  <div class="flex gap-4 text-sm text-slate-500 mt-2">
+    <a href="{{ url_for('analytics.index') }}" class="hover:text-slate-900 pb-1">Списания по периодам</a>
+    <span class="font-medium text-slate-900 border-b-2 border-slate-900 pb-1">Сводный отчёт</span>
+  </div>
+</div>
+
+<form method="get" class="flex flex-wrap items-end gap-3 mb-6">
+  <div>
+    <label class="block text-xs text-slate-500 mb-1">Выручка/затраты с</label>
+    <input type="date" name="date_from" value="{{ date_from or '' }}" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label class="block text-xs text-slate-500 mb-1">по</label>
+    <input type="date" name="date_to" value="{{ date_to or '' }}" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  </div>
+  <button class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm">Применить</button>
+</form>
+<p class="text-xs text-slate-400 mb-6">Остаток комплектующих на складе и средняя наработка — всегда на текущий момент (снимок). Выручка и затраты — за выбранный период (без дат — за всё время).</p>
+
+<div class="grid md:grid-cols-3 gap-4 mb-6">
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Остаток комплектующих на складе, ₽</div>
+    <div class="text-2xl font-semibold text-blue-700 mt-1">{{ data.stock_value_rub|num }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Средняя наработка на инструмент, ч</div>
+    <div class="text-2xl font-semibold mt-1">{{ data.avg_tool_hours|num }}</div>
+    <div class="text-xs text-slate-400 mt-0.5">по {{ data.tools_count }} инструмент(ам)</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Средняя наработка на компонент, ч</div>
+    <div class="text-2xl font-semibold mt-1">{{ data.avg_component_hours|num }}</div>
+    <div class="text-xs text-slate-400 mt-0.5">по {{ data.components_count }} компонент(ам)</div>
+  </div>
+</div>
+
+<div class="grid md:grid-cols-3 gap-4 mb-6">
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Общая выручка на все инструменты, ₽</div>
+    <div class="text-2xl font-semibold text-green-700 mt-1">{{ data.total_revenue|num }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Общие затраты, ₽</div>
+    <div class="text-2xl font-semibold mt-1">{{ data.total_costs|num }}</div>
+    <div class="text-xs text-slate-400 mt-0.5">по {{ data.jobs_count }} работе/работам</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Результат за период, ₽</div>
+    <div class="text-2xl font-semibold mt-1 {{ 'text-green-700' if data.net_result >= 0 else 'text-red-700' }}">{{ data.net_result|num }}</div>
+    <div class="text-xs text-slate-400 mt-0.5">выручка − затраты</div>
+  </div>
+</div>
+{% endblock %}

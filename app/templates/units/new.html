@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Регистрация компонента — AGIT tool and components track{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Регистрация серийных компонентов</h1>
+<form method="post" class="bg-white border border-slate-200 rounded-xl p-6 max-w-2xl space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Деталь *</label>
+    <select name="part_id" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      {% for p in parts %}
+      <option value="{{ p.id }}">{{ p.part_name }} ({{ p.part_number }}) — {{ p.category }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Серийные номера (по одному на строку) *</label>
+    <textarea name="serial_numbers" rows="4" required placeholder="AN000043-01&#10;AN000043-02" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-mono"></textarea>
+    <p class="text-xs text-slate-400 mt-1">OD/ID ниже применяются ко всем перечисленным номерам — если значения разные, добавляйте единицы по одной.</p>
+  </div>
+  <div class="grid grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Дата изготовления</label>
+      <input name="date_mfg" placeholder="Dec-25" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Место хранения</label>
+      <input name="location" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">OD, мм (для ротора)</label>
+      <input name="od_mm" type="number" step="0.001" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">ID, мм (для статора)</label>
+      <input name="id_mm" type="number" step="0.001" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+    </div>
+    <div class="col-span-2">
+      <label class="block text-sm font-medium text-slate-700 mb-1">Примечания</label>
+      <input name="remarks" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+    </div>
+  </div>
+  <button class="bg-slate-900 text-white rounded-lg px-5 py-2.5 text-sm font-medium hover:bg-slate-800">Сохранить</button>
+</form>
+{% endblock %}

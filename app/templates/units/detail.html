@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}{{ unit.serial_number }} — AGIT tool and components track{% endblock %}
+{% block content %}
+<a href="{{ url_for('units.list_units') }}" class="text-sm text-blue-700 hover:underline">&larr; К списку компонентов</a>
+<div class="flex items-start justify-between mt-2 mb-6">
+  <div>
+    <h1 class="text-2xl font-semibold">{{ unit.serial_number }}</h1>
+    <p class="text-sm text-slate-500">{{ unit.part_name }} ({{ unit.part_number }}) · {{ unit.tool_size }}</p>
+  </div>
+  <div class="flex items-center gap-2">
+    <span class="px-3 py-1 rounded text-sm status-{{ unit.status }}">{{ unit.status }}</span>
+    {% if can_edit and unit.status != 'written_off' %}
+    <a href="{{ url_for('units.writeoff', unit_id=unit.id) }}" class="bg-red-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-red-700">Списать</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid md:grid-cols-3 gap-6 mb-6">
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <div class="text-xs text-slate-500 mb-1">Суммарная наработка</div>
+    <div class="text-2xl font-semibold">{{ unit.circulation_hours|num }} ч</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <div class="text-xs text-slate-500 mb-1">Кол-во обслуживаний</div>
+    <div class="text-2xl font-semibold">{{ unit.service_count }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <div class="text-xs text-slate-500 mb-1">
+      {% if unit.category == 'rotor' %}Наружный диаметр (OD){% elif unit.category == 'stator' %}Внутренний диаметр (ID){% else %}Размер{% endif %}
+    </div>
+    <div class="text-2xl font-semibold">{{ (unit.od_mm|num if unit.od_mm else unit.id_mm|num) or '—' }} мм</div>
+  </div>
+</div>
+
+{% if paired_with %}
+<div class="bg-orange-50 border border-orange-200 rounded-xl p-4 mb-6 text-sm">
+  В паре с <a href="{{ url_for('units.detail', unit_id=paired_with.id) }}" class="font-medium text-orange-800 hover:underline">{{ paired_with.serial_number }}</a> ({{ paired_with.part_name }})
+</div>
+{% endif %}
+
+{% if installed_on_tool %}
+<div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm">
+  Установлен на инструмент <a href="{{ url_for('tools.detail', tool_id=installed_on_tool.id) }}" class="font-medium text-blue-800 hover:underline">{{ installed_on_tool.serial_number }}</a> — наработка компонента прибавляется автоматически при внесении наработки инструмента.
+</div>
+{% endif %}
+
+<div class="grid md:grid-cols-2 gap-6">
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <h2 class="font-semibold mb-3">История наработки</h2>
+    {% if cumulative %}
+    <canvas id="hoursChart" height="160"></canvas>
+    {% else %}
+    <p class="text-sm text-slate-400 mb-3">Записей о наработке пока нет.</p>
+    {% endif %}
+    <table class="w-full text-sm mt-4">
+      <thead class="text-slate-500 text-left"><tr><th class="py-1">Дата</th><th class="py-1">+часы</th><th class="py-1">+обсл.</th><th class="py-1">Установка</th>{% if is_admin %}<th class="py-1"></th>{% endif %}</tr></thead>
+      <tbody>
+        {% for l in usage_logs %}
+        {% if is_admin and not l.source_tool_usage_log_id %}
+        <tr class="border-t border-slate-100">
+          <td class="py-1"><input type="date" name="log_date" form="unit-usage-edit-{{ l.id }}" value="{{ l.log_date }}" class="w-32 border border-slate-200 rounded px-1 py-0.5 text-xs"></td>
+          <td class="py-1"><input type="number" step="0.1" name="hours_added" form="unit-usage-edit-{{ l.id }}" value="{{ l.hours_added }}" class="w-14 border border-slate-200 rounded px-1 py-0.5 text-xs"></td>
+          <td class="py-1"><input type="number" name="service_count_added" form="unit-usage-edit-{{ l.id }}" value="{{ l.service_count_added }}" class="w-12 border border-slate-200 rounded px-1 py-0.5 text-xs"></td>
+          <td class="py-1"><input name="tool_assembly" form="unit-usage-edit-{{ l.id }}" value="{{ l.tool_assembly }}" class="w-full border border-slate-200 rounded px-1 py-0.5 text-xs"></td>
+          <td class="py-1 text-right whitespace-nowrap">
+            <button type="submit" form="unit-usage-edit-{{ l.id }}" class="text-blue-700 hover:underline text-xs">✓</button>
+            <button type="submit" form="unit-usage-delete-{{ l.id }}" class="text-red-700 hover:underline text-xs ml-2">✕</button>
+          </td>
+        </tr>
+        {% elif is_admin %}
+        <tr class="border-t border-slate-100"><td class="py-1">{{ l.log_date }}</td><td class="py-1">{{ l.hours_added|num }}</td><td class="py-1">{{ l.service_count_added }}</td><td class="py-1 text-slate-500">{{ l.tool_assembly }} <span class="text-slate-400" title="Зеркало наработки инструмента — редактируется на странице инструмента">·</span></td><td></td></tr>
+        {% else %}
+        <tr class="border-t border-slate-100"><td class="py-1">{{ l.log_date }}</td><td class="py-1">{{ l.hours_added|num }}</td><td class="py-1">{{ l.service_count_added }}</td><td class="py-1 text-slate-500">{{ l.tool_assembly }}</td></tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if is_admin %}
+    {% for l in usage_logs if not l.source_tool_usage_log_id %}
+    <form id="unit-usage-edit-{{ l.id }}" method="post" action="{{ url_for('units.edit_usage', unit_id=unit.id, log_id=l.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+    <form id="unit-usage-delete-{{ l.id }}" method="post" action="{{ url_for('units.delete_usage', unit_id=unit.id, log_id=l.id) }}" onsubmit="return confirm('Удалить эту запись наработки?');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+    {% endfor %}
+    {% endif %}
+
+    {% if can_edit and unit.status != 'written_off' %}
+    <form method="post" action="{{ url_for('units.add_usage', unit_id=unit.id) }}" class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div><label class="block text-xs text-slate-500 mb-1">Дата *</label><input type="date" name="log_date" required class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
+      <div><label class="block text-xs text-slate-500 mb-1">Установка на</label><input name="tool_assembly" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
+      <div><label class="block text-xs text-slate-500 mb-1">Добавить часов</label><input type="number" step="0.1" name="hours_added" value="0" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
+      <div><label class="block text-xs text-slate-500 mb-1">Добавить обслуживаний</label><input type="number" name="service_count_added" value="0" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
+      <div class="col-span-2"><button class="bg-slate-900 text-white rounded-lg px-4 py-2 text-sm hover:bg-slate-800">Добавить запись</button></div>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <h2 class="font-semibold mb-3">История списаний</h2>
+    {% if write_offs %}
+    <table class="w-full text-sm">
+      <thead class="text-slate-500 text-left"><tr><th class="py-1">Дата</th><th class="py-1">Причина</th><th class="py-1">Акт</th></tr></thead>
+      <tbody>
+        {% for w in write_offs %}
+        <tr class="border-t border-slate-100"><td class="py-1">{{ w.write_off_date }}</td><td class="py-1">{{ w.reason }}</td><td class="py-1 text-slate-500">{{ w.act_number }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-sm text-slate-400">Компонент не списывался.</p>
+    {% endif %}
+
+    <h2 class="font-semibold mb-3 mt-6">Примечания</h2>
+    <p class="text-sm text-slate-600">{{ unit.remarks or '—' }}</p>
+  </div>
+</div>
+
+{% if cumulative %}
+<script>
+  const ctx = document.getElementById('hoursChart');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: {{ cumulative|map(attribute='date')|list|tojson }},
+      datasets: [{
+        label: 'Наработка, ч (накопительно)',
+        data: {{ cumulative|map(attribute='hours')|list|tojson }},
+        borderColor: '#2a78d6',
+        backgroundColor: 'rgba(42,120,214,0.1)',
+        borderWidth: 2,
+        pointRadius: 3,
+        pointBackgroundColor: '#2a78d6',
+        fill: true,
+        tension: 0.2,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, grid: { color: '#f0efec' } }, x: { grid: { display: false } } }
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Инструменты — AGIT tool and components track{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <h1 class="text-2xl font-semibold">Инструменты (буровые компоновки)</h1>
+  <div class="flex gap-4 text-sm text-slate-500 mt-2">
+    <span class="font-medium text-slate-900 border-b-2 border-slate-900 pb-1">Список инструментов</span>
+    <a href="{{ url_for('customers.list_view') }}" class="hover:text-slate-900 pb-1">Заказчики</a>
+  </div>
+</div>
+<div class="flex items-center justify-end mb-6">
+  {% if can_edit %}
+  <a href="{{ url_for('tools.new_tool') }}" class="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800">+ Новый инструмент</a>
+  {% endif %}
+</div>
+
+<form method="get" class="flex flex-wrap gap-3 mb-6">
+  <input type="text" name="q" value="{{ q or '' }}" placeholder="Серийный номер или типоразмер" class="border border-slate-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[200px]">
+  <select name="status" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+    <option value="">Все статусы</option>
+    {% for k, v in status_labels.items() %}
+    <option value="{{ k }}" {{ 'selected' if status==k }}>{{ v }}</option>
+    {% endfor %}
+  </select>
+  <button class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm">Фильтр</button>
+</form>
+
+<div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-slate-500 text-left">
+    <tr>
+      <th class="px-4 py-2">Серийный №</th><th class="px-4 py-2">Наименование</th><th class="px-4 py-2">Типоразмер</th><th class="px-4 py-2">Статус</th>
+      <th class="px-4 py-2 text-right">Наработка, ч</th>
+      <th class="px-4 py-2 text-right">Выручка, ₽</th><th class="px-4 py-2 text-right">Стоимость ремонтов, ₽</th>
+      <th class="px-4 py-2 text-right" title="Начисленная амортизация — 1/18 себестоимости в месяц">Амортизация, ₽</th>
+      <th class="px-4 py-2 text-right font-semibold">Рентабельность, ₽</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in tools %}
+    <tr class="border-t border-slate-100 hover:bg-slate-50">
+      <td class="px-4 py-2"><a href="{{ url_for('tools.detail', tool_id=t.id) }}" class="text-blue-700 hover:underline font-medium">{{ t.serial_number }}</a></td>
+      <td class="px-4 py-2 text-slate-500">{{ t.tool_name or '—' }}</td>
+      <td class="px-4 py-2 text-slate-500">{{ t.tool_size or '—' }}</td>
+      <td class="px-4 py-2">{{ status_labels.get(t.status, t.status) }}</td>
+      <td class="px-4 py-2 text-right">{{ t.cumulative_hours|num }}</td>
+      <td class="px-4 py-2 text-right">{{ t.cumulative_revenue|num }}</td>
+      <td class="px-4 py-2 text-right">{{ t.jobs_cost|num }}</td>
+      <td class="px-4 py-2 text-right text-slate-500">{{ t.depreciation.accrued_rub|num }}</td>
+      <td class="px-4 py-2 text-right font-semibold {{ 'text-green-700' if t.profitability >= 0 else 'text-red-700' }}">{{ t.profitability|num }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">Инструменты пока не зарегистрированы.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

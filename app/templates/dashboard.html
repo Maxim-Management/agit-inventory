@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Обзор — AGIT tool and components track{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Обзор склада</h1>
+
+<div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Позиций в справочнике</div>
+    <div class="text-2xl font-semibold mt-1">{{ total_parts }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">На складе</div>
+    <div class="text-2xl font-semibold mt-1 text-green-700">{{ total_in_stock }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">В эксплуатации</div>
+    <div class="text-2xl font-semibold mt-1 text-blue-700">{{ total_installed }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Списано всего</div>
+    <div class="text-2xl font-semibold mt-1 text-red-700">{{ total_written_off }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Списано за 30 дней</div>
+    <div class="text-2xl font-semibold mt-1">{{ writeoffs_30d }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Стоимость остатка, ₽</div>
+    <div class="text-2xl font-semibold mt-1 text-blue-700">{{ stock_value_rub|num }}</div>
+  </div>
+</div>
+
+<div class="grid md:grid-cols-3 gap-6">
+  <div class="md:col-span-1 bg-white border border-slate-200 rounded-xl p-5">
+    <h2 class="font-semibold mb-3">Ниже минимального остатка</h2>
+    {% if low_stock %}
+    <ul class="space-y-2 text-sm">
+      {% for p in low_stock %}
+      <li class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <a href="{{ url_for('parts.detail', part_id=p.id) }}" class="hover:underline">{{ p.part_name }}</a>
+        <span class="text-red-600 font-medium">{{ p.in_stock }} / {{ p.min_stock_qty }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-400">Все остатки в норме.</p>
+    {% endif %}
+  </div>
+
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <h2 class="font-semibold mb-3">Последние списания</h2>
+    {% if recent_writeoffs %}
+    <ul class="space-y-2 text-sm">
+      {% for w in recent_writeoffs %}
+      <li class="flex justify-between border-b border-slate-100 pb-2">
+        <span>{{ w.part_name }} <span class="text-slate-400">· {{ w.serial_number if w.serial_number else (w.quantity|num) + ' шт' }}</span></span>
+        <span class="text-slate-500">{{ w.write_off_date }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-400">Списаний пока нет.</p>
+    {% endif %}
+  </div>
+
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <h2 class="font-semibold mb-3">Последние поступления</h2>
+    {% if recent_receipts %}
+    <ul class="space-y-2 text-sm">
+      {% for r in recent_receipts %}
+      <li class="flex justify-between border-b border-slate-100 pb-2">
+        <span>{{ r.part_name }}<span class="text-slate-400"> · {{ r.quantity|num }} шт</span></span>
+        <span class="text-slate-500">{{ r.receipt_date }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-sm text-slate-400">Поступлений пока нет.</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

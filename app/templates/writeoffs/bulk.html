@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Списание расходника — AGIT tool and components track{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Списание расходника (по количеству)</h1>
+<form method="post" class="bg-white border border-slate-200 rounded-xl p-6 max-w-lg space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Деталь *</label>
+    <select name="part_id" id="part_id" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      {% for p in parts %}
+      <option value="{{ p.id }}" {{ 'selected' if preselect_part_id==p.id }}>{{ p.part_name }} ({{ p.part_number }})</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Партия поступления, из которой списать</label>
+    <select name="receipt_id" id="receipt_id" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></select>
+    <p class="text-xs text-slate-400 mt-1">По умолчанию — самая старая партия с остатком (FIFO). Если открытых партий нет, стоимость списания не будет привязана к конкретному поступлению.</p>
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Количество *</label>
+    <input type="number" step="0.01" name="quantity" required value="1" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Дата списания *</label>
+    <input type="date" name="write_off_date" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-2">Причина списания *</label>
+    <div class="space-y-2">
+      {% for k, v in reason_labels.items() %}
+      <label class="flex items-center gap-2 text-sm"><input type="radio" name="reason" value="{{ k }}" required {{ 'checked' if k=='repair' }}> {{ v }}</label>
+      {% endfor %}
+    </div>
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Номер и дата акта списания</label>
+    <input name="act_number" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Комментарий</label>
+    <textarea name="note" rows="3" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
+  </div>
+  <p class="text-xs text-slate-400">Чтобы включить это списание в отчёт по стоимости ремонта/сборки, привяжите компонент со страницы конкретной работы: <a href="{{ url_for('jobs.list_view') }}" class="text-blue-700 hover:underline">Ремонтные работы</a>.</p>
+  <button class="bg-red-600 text-white rounded-lg px-5 py-2.5 text-sm font-medium hover:bg-red-700">Списать</button>
+</form>
+<script>
+  const batchesByPart = {{ batches_by_part_json|safe }};
+  const partSelect = document.getElementById('part_id');
+  const receiptSelect = document.getElementById('receipt_id');
+  function refreshBatches() {
+    const batches = batchesByPart[partSelect.value] || [];
+    receiptSelect.innerHTML = '';
+    if (!batches.length) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'Нет открытых партий — без привязки';
+      receiptSelect.appendChild(opt);
+      return;
+    }
+    batches.forEach(b => {
+      const opt = document.createElement('option');
+      opt.value = b.id;
+      opt.textContent = b.label;
+      receiptSelect.appendChild(opt);
+    });
+  }
+  partSelect.addEventListener('change', refreshBatches);
+  refreshBatches();
+</script>
+{% endblock %}

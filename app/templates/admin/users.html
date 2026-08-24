@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Пользователи — AGIT tool and components track{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-semibold">Пользователи и доступ</h1>
+  <a href="{{ url_for('admin.new_user') }}" class="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800">+ Новый пользователь</a>
+</div>
+
+<div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-slate-500 text-left">
+    <tr><th class="px-4 py-2">Email</th><th class="px-4 py-2">Имя</th><th class="px-4 py-2">Роль</th><th class="px-4 py-2">Статус</th><th class="px-4 py-2"></th></tr>
+  </thead>
+  <tbody>
+    {% for u in users %}
+    <tr class="border-t border-slate-100">
+      <td class="px-4 py-2">{{ u.email }}</td>
+      <td class="px-4 py-2">{{ u.full_name }}</td>
+      <td class="px-4 py-2">
+        <form method="post" action="{{ url_for('admin.change_role', user_id=u.id) }}" class="inline-flex items-center gap-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <select name="role" onchange="this.form.submit()" class="border border-slate-300 rounded px-2 py-1 text-xs">
+            {% for k, v in role_labels.items() %}
+            <option value="{{ k }}" {{ 'selected' if u.role==k }}>{{ v }}</option>
+            {% endfor %}
+          </select>
+        </form>
+      </td>
+      <td class="px-4 py-2">
+        {% if u.is_active %}<span class="text-green-700 text-xs">активен</span>{% else %}<span class="text-red-600 text-xs">отключён</span>{% endif %}
+      </td>
+      <td class="px-4 py-2 text-right">
+        <form method="post" action="{{ url_for('admin.toggle_active', user_id=u.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="text-sm text-slate-500 hover:underline">{{ 'Отключить' if u.is_active else 'Включить' }}</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

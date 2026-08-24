@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Новое списание — AGIT tool and components track{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Новое списание</h1>
+
+<form method="get" class="flex gap-3 mb-6 max-w-lg">
+  <input type="text" name="q" value="{{ q }}" placeholder="Поиск по серийному номеру или названию" class="border border-slate-300 rounded-lg px-3 py-2 text-sm flex-1">
+  <button class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm">Найти</button>
+</form>
+
+{% if candidates %}
+<div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6 max-w-2xl">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-slate-500 text-left"><tr><th class="px-4 py-2">Серийный №</th><th class="px-4 py-2">Деталь</th><th class="px-4 py-2"></th></tr></thead>
+  <tbody>
+    {% for c in candidates %}
+    <tr class="border-t border-slate-100">
+      <td class="px-4 py-2">{{ c.serial_number }}</td>
+      <td class="px-4 py-2">{{ c.part_name }} ({{ c.part_number }})</td>
+      <td class="px-4 py-2 text-right"><a href="{{ url_for('units.writeoff', unit_id=c.id) }}" class="text-red-600 hover:underline text-sm">Списать &rarr;</a></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% elif q %}
+<p class="text-sm text-slate-400">Ничего не найдено на складе по запросу «{{ q }}».</p>
+{% else %}
+<p class="text-sm text-slate-400">Введите серийный номер или название детали, чтобы найти компонент для списания.</p>
+{% endif %}
+{% endblock %}

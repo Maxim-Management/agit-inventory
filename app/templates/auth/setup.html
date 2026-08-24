@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Первая настройка — AGIT tool and components track{% endblock %}
+{% block content %}
+<div class="max-w-sm mx-auto mt-16 bg-white border border-slate-200 rounded-xl shadow-sm p-8">
+  <h1 class="text-xl font-semibold mb-1">Первая настройка</h1>
+  <p class="text-sm text-slate-500 mb-6">
+    Пользователей в базе ещё нет. Создайте первого администратора — эта
+    страница станет недоступна сразу после этого.
+  </p>
+  <form method="post" class="space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Ваше имя</label>
+      <input name="full_name" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Email *</label>
+      <input type="email" name="email" required autofocus class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Пароль * (не короче 8 символов)</label>
+      <input type="password" name="password" required minlength="8" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-slate-700 mb-1">Повторите пароль *</label>
+      <input type="password" name="password2" required minlength="8" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+    <button type="submit" class="w-full bg-slate-900 text-white rounded-lg py-2.5 text-sm font-medium hover:bg-slate-800">Создать администратора и войти</button>
+  </form>
+</div>
+{% endblock %}

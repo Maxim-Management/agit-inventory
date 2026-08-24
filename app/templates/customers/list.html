@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Заказчики — AGIT tool and components track{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <h1 class="text-2xl font-semibold">Инструменты</h1>
+  <div class="flex gap-4 text-sm text-slate-500 mt-2">
+    <a href="{{ url_for('tools.list_view') }}" class="hover:text-slate-900 pb-1">Список инструментов</a>
+    <span class="font-medium text-slate-900 border-b-2 border-slate-900 pb-1">Заказчики</span>
+  </div>
+</div>
+
+<div class="flex items-center justify-between mb-6">
+  <p class="text-sm text-slate-500">Ставки заказчика подтягиваются автоматически при внесении выручки по инструменту (номер скважины, часы работы, сутки дежурства).</p>
+  {% if can_edit %}
+  <a href="{{ url_for('customers.new_customer') }}" class="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800 whitespace-nowrap ml-4">+ Новый заказчик</a>
+  {% endif %}
+</div>
+
+<form method="get" class="flex flex-wrap gap-3 mb-6">
+  <input type="text" name="q" value="{{ q or '' }}" placeholder="Название или номер договора" class="border border-slate-300 rounded-lg px-3 py-2 text-sm flex-1 min-w-[240px]">
+  <button class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm">Найти</button>
+</form>
+
+<div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-slate-500 text-left">
+    <tr>
+      <th class="px-4 py-2">Заказчик</th>
+      <th class="px-4 py-2">Номер договора</th>
+      <th class="px-4 py-2 text-right">Ставка за час, ₽</th>
+      <th class="px-4 py-2 text-right">Ставка за сутки ожидания, ₽</th>
+      <th class="px-4 py-2 text-right">Выручка по нему, ₽</th>
+      <th class="px-4 py-2"></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in customers %}
+    <tr class="border-t border-slate-100 hover:bg-slate-50">
+      <td class="px-4 py-2 font-medium">{{ c.name }}</td>
+      <td class="px-4 py-2 text-slate-500">{{ c.contract_number or '—' }}</td>
+      <td class="px-4 py-2 text-right">{{ c.work_rate_rub_per_hour|num }}</td>
+      <td class="px-4 py-2 text-right">{{ c.standby_rate_rub_per_day|num }}</td>
+      <td class="px-4 py-2 text-right">{{ c.revenue_total|num }}</td>
+      <td class="px-4 py-2 text-right">
+        {% if can_edit %}
+        <a href="{{ url_for('customers.edit_customer', customer_id=c.id) }}" class="text-blue-700 hover:underline text-xs">Редактировать</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">Заказчики пока не добавлены.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

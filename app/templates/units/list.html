@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Серийные компоненты — AGIT tool and components track{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-semibold">Серийные компоненты</h1>
+  {% if can_edit %}
+  <a href="{{ url_for('units.new_unit') }}" class="bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800">+ Зарегистрировать</a>
+  {% endif %}
+</div>
+
+<form method="get" class="flex flex-wrap gap-3 mb-4">
+  <input type="text" name="q" value="{{ q }}" placeholder="Серийный №, название, номер" class="border border-slate-300 rounded-lg px-3 py-2 text-sm flex-1 max-w-sm">
+  <select name="status" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+    <option value="">Все статусы</option>
+    <option value="in_stock" {{ 'selected' if status=='in_stock' }}>На складе</option>
+    <option value="installed" {{ 'selected' if status=='installed' }}>В эксплуатации</option>
+    <option value="paired" {{ 'selected' if status=='paired' }}>В паре</option>
+    <option value="written_off" {{ 'selected' if status=='written_off' }}>Списан</option>
+  </select>
+  <select name="category" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+    <option value="">Все категории</option>
+    <option value="rotor" {{ 'selected' if category=='rotor' }}>Ротор</option>
+    <option value="stator" {{ 'selected' if category=='stator' }}>Статор</option>
+    <option value="other" {{ 'selected' if category=='other' }}>Прочее</option>
+  </select>
+  <button class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm">Найти</button>
+</form>
+
+<div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-slate-500 text-left">
+    <tr>
+      <th class="px-4 py-2">Серийный №</th>
+      <th class="px-4 py-2">Деталь</th>
+      <th class="px-4 py-2">Типоразмер</th>
+      <th class="px-4 py-2">Статус</th>
+      <th class="px-4 py-2 text-right">Наработка, ч</th>
+      <th class="px-4 py-2">OD/ID</th>
+      <th class="px-4 py-2">Установлен на</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for u in units %}
+    <tr class="border-t border-slate-100 hover:bg-slate-50">
+      <td class="px-4 py-2"><a href="{{ url_for('units.detail', unit_id=u.id) }}" class="text-blue-700 hover:underline font-medium">{{ u.serial_number }}</a></td>
+      <td class="px-4 py-2">{{ u.part_name }} <span class="text-slate-400">({{ u.part_number }})</span></td>
+      <td class="px-4 py-2 text-slate-500">{{ u.tool_size }}</td>
+      <td class="px-4 py-2"><span class="px-2 py-0.5 rounded text-xs status-{{ u.status }}">{{ u.status }}</span></td>
+      <td class="px-4 py-2 text-right">{{ u.circulation_hours|num }}</td>
+      <td class="px-4 py-2 text-slate-500">{% if u.od_mm %}OD {{ u.od_mm|num }}{% elif u.id_mm %}ID {{ u.id_mm|num }}{% else %}—{% endif %}</td>
+      <td class="px-4 py-2 text-slate-500">{{ u.installed_on }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" class="px-4 py-6 text-center text-slate-400">Ничего не найдено.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

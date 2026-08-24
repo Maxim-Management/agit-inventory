@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+{% block title %}{{ tool.serial_number }} — AGIT tool and components track{% endblock %}
+{% block content %}
+<a href="{{ url_for('tools.list_view') }}" class="text-sm text-blue-700 hover:underline">&larr; К списку инструментов</a>
+<div class="flex items-start justify-between mt-2 mb-6">
+  <div>
+    <h1 class="text-2xl font-semibold">{{ tool.serial_number }}{% if tool.tool_name %} <span class="text-slate-400 font-normal">· {{ tool.tool_name }}</span>{% endif %}</h1>
+    <p class="text-sm text-slate-500">
+      {{ tool.tool_size or '—' }}
+      {% if tool.location %}· {{ tool.location }}{% endif %}
+      {% if tool.commissioned_date %}· в эксплуатации с {{ tool.commissioned_date }}{% endif %}
+    </p>
+  </div>
+  <div class="flex items-center gap-2">
+    <span class="px-3 py-1 rounded text-sm bg-slate-100 text-slate-700">{{ status_labels.get(tool.status, tool.status) }}</span>
+    {% if can_edit %}
+    <a href="{{ url_for('tools.edit_tool', tool_id=tool.id) }}" class="bg-slate-100 border border-slate-300 text-sm px-4 py-2 rounded-lg hover:bg-slate-200">Редактировать</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-2">
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Наработка, ч</div>
+    <div class="text-xl font-semibold mt-1">{{ tool.cumulative_hours|num }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Выручка, ₽</div>
+    <div class="text-xl font-semibold mt-1">{{ tool.cumulative_revenue|num }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Стоимость ремонтов, ₽</div>
+    <div class="text-xl font-semibold mt-1">{{ tool.jobs_cost|num }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Начисленная амортизация, ₽</div>
+    <div class="text-xl font-semibold mt-1">{{ tool.depreciation.accrued_rub|num }}</div>
+    <div class="text-xs text-slate-400 mt-0.5">
+      {% if not tool.depreciation.has_data %}не задана себестоимость и/или дата ввода{% else %}{{ tool.depreciation.months_elapsed }} из {{ tool.depreciation.months_total }} мес.{% if tool.depreciation.fully_depreciated %} · полностью{% endif %}{% endif %}
+    </div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Рентабельность, ₽</div>
+    <div class="text-xl font-semibold mt-1 {{ 'text-green-700' if tool.profitability >= 0 else 'text-red-700' }}">{{ tool.profitability|num }}</div>
+  </div>
+</div>
+<p class="text-xs text-slate-400 mb-6">Рентабельность = выручка − (начисленная амортизация + стоимость ремонтов).</p>
+
+<div class="grid md:grid-cols-2 gap-6 mb-6">
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <h2 class="font-semibold mb-3">Установленные компоненты</h2>
+    {% if units %}
+    <table class="w-full text-sm">
+      <thead class="text-slate-500 text-left"><tr><th class="py-1">Серийный №</th><th class="py-1">Деталь</th><th class="py-1">Наработка, ч</th><th class="py-1"></th></tr></thead>
+      <tbody>
+        {% for u in units %}
+        <tr class="border-t border-slate-100">
+          <td class="py-1"><a href="{{ url_for('units.detail', unit_id=u.id) }}" class="text-blue-700 hover:underline">{{ u.serial_number }}</a></td>
+          <td class="py-1 text-slate-500">{{ u.part_name }}</td>
+          <td class="py-1">{{ u.circulation_hours|num }}</td>
+          <td class="py-1 text-right">
+            {% if can_edit %}
+            <form method="post" action="{{ url_for('tools.uninstall', tool_id=tool.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="unit_id" value="{{ u.id }}">
+              <button class="text-red-700 hover:underline text-xs">Снять</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-sm text-slate-400">Компоненты пока не установлены.</p>
+    {% endif %}
+
+    {% if can_edit %}
+    <div class="mt-4 pt-4 border-t border-slate-100">
+      <p class="text-xs font-medium text-slate-500 mb-2">Установить компонент со склада</p>
+      <form method="get" class="flex gap-2 mb-2">
+        <input type="text" name="q" value="{{ q }}" placeholder="Серийный № или название детали" class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm flex-1">
+        <button class="bg-slate-100 border border-slate-300 rounded-lg px-3 py-1.5 text-sm">Найти</button>
+      </form>
+      {% for c in unit_candidates %}
+      <form method="post" action="{{ url_for('tools.install', tool_id=tool.id) }}" class="flex items-center gap-2 text-sm border-t border-slate-100 py-1.5">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="unit_id" value="{{ c.id }}">
+        <span class="flex-1">{{ c.serial_number }} — {{ c.part_name }}</span>
+        <button class="text-blue-700 hover:underline">Установить</button>
+      </form>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <h2 class="font-semibold mb-3">Наработка инструмента</h2>
+    {% if cumulative %}
+    <canvas id="toolHoursChart" height="160"></canvas>
+    {% else %}
+    <p class="text-sm text-slate-400 mb-3">Записей о наработке пока нет.</p>
+    {% endif %}
+    <table class="w-full text-sm mt-4">
+      <thead class="text-slate-500 text-left"><tr><th class="py-1">Дата</th><th class="py-1">+часы</th><th class="py-1">Примечание</th>{% if is_admin %}<th class="py-1"></th>{% endif %}</tr></thead>
+      <tbody>
+        {% for l in usage_history %}
+        {% if is_admin %}
+        <tr class="border-t border-slate-100">
+          <td class="py-1"><input type="date" name="log_date" form="usage-edit-{{ l.id }}" value="{{ l.log_date }}" class="w-32 border border-slate-200 rounded px-1 py-0.5 text-xs"></td>
+          <td class="py-1"><input type="number" step="0.1" name="hours_added" form="usage-edit-{{ l.id }}" value="{{ l.hours_added }}" class="w-16 border border-slate-200 rounded px-1 py-0.5 text-xs"></td>
+          <td class="py-1"><input name="note" form="usage-edit-{{ l.id }}" value="{{ l.note }}" class="w-full border border-slate-200 rounded px-1 py-0.5 text-xs"></td>
+          <td class="py-1 text-right whitespace-nowrap">
+            <button type="submit" form="usage-edit-{{ l.id }}" class="text-blue-700 hover:underline text-xs">✓</button>
+            <button type="submit" form="usage-delete-{{ l.id }}" class="text-red-700 hover:underline text-xs ml-2">✕</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr class="border-t border-slate-100"><td class="py-1">{{ l.log_date }}</td><td class="py-1">{{ l.hours_added|num }}</td><td class="py-1 text-slate-500">{{ l.note }}</td></tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if is_admin %}
+    {% for l in usage_history %}
+    <form id="usage-edit-{{ l.id }}" method="post" action="{{ url_for('tools.edit_usage', tool_id=tool.id, log_id=l.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+    <form id="usage-delete-{{ l.id }}" method="post" action="{{ url_for('tools.delete_usage', tool_id=tool.id, log_id=l.id) }}" onsubmit="return confirm('Удалить эту запись наработки? Наработка затронутых компонентов будет пересчитана.');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+    {% endfor %}
+    {% endif %}
+    {% if can_edit %}
+    <form method="post" action="{{ url_for('tools.add_usage', tool_id=tool.id) }}" class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div><label class="block text-xs text-slate-500 mb-1">Дата *</label><input type="date" name="log_date" required class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
+      <div><label class="block text-xs text-slate-500 mb-1">Добавить часов *</label><input type="number" step="0.1" name="hours_added" value="0" required class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
+      <div class="col-span-2"><label class="block text-xs text-slate-500 mb-1">Примечание</label><input name="note" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
+      <div class="col-span-2"><button class="bg-slate-900 text-white rounded-lg px-4 py-2 text-sm hover:bg-slate-800">Добавить наработку</button></div>
+    </form>
+    <p class="text-xs text-slate-400 mt-2">Добавленные часы автоматически прибавятся к наработке всех компонентов, установленных на инструменте сейчас.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="grid md:grid-cols-2 gap-6">
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <h2 class="font-semibold mb-3">Выручка</h2>
+    {% if revenue_history %}
+    <table class="w-full text-sm">
+      <thead class="text-slate-500 text-left">
+        <tr>
+          <th class="py-1">Дата</th><th class="py-1">Заказчик</th><th class="py-1">Скв. №</th>
+          <th class="py-1 text-right">Работа, ч</th><th class="py-1 text-right">Дежурство, сут</th>
+          <th class="py-1 text-right">Сумма, ₽</th><th class="py-1">Примечание</th>{% if is_admin %}<th class="py-1"></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in revenue_history %}
+        {% if is_admin and not r.customer_id %}
+        <tr class="border-t border-slate-100">
+          <td class="py-1"><input type="date" name="revenue_date" form="revenue-edit-{{ r.id }}" value="{{ r.revenue_date }}" class="w-32 border border-slate-200 rounded px-1 py-0.5 text-xs"></td>
+          <td class="py-1 text-slate-400">—</td>
+          <td class="py-1 text-slate-400">—</td>
+          <td class="py-1 text-right text-slate-400">—</td>
+          <td class="py-1 text-right text-slate-400">—</td>
+          <td class="py-1 text-right"><input type="number" step="0.01" name="amount" form="revenue-edit-{{ r.id }}" value="{{ r.amount }}" class="w-20 border border-slate-200 rounded px-1 py-0.5 text-xs text-right"></td>
+          <td class="py-1"><input name="note" form="revenue-edit-{{ r.id }}" value="{{ r.note }}" class="w-full border border-slate-200 rounded px-1 py-0.5 text-xs"></td>
+          <td class="py-1 text-right whitespace-nowrap">
+            <button type="submit" form="revenue-edit-{{ r.id }}" class="text-blue-700 hover:underline text-xs">✓</button>
+            <button type="submit" form="revenue-delete-{{ r.id }}" class="text-red-700 hover:underline text-xs ml-2">✕</button>
+          </td>
+        </tr>
+        {% else %}
+        <tr class="border-t border-slate-100">
+          <td class="py-1">{{ r.revenue_date }}</td>
+          <td class="py-1 text-slate-500">{{ r.customer_name or '—' }}</td>
+          <td class="py-1 text-slate-500">{{ r.well_number or '—' }}</td>
+          <td class="py-1 text-right">{{ r.work_hours|num if r.work_hours is not none else '—' }}</td>
+          <td class="py-1 text-right">{{ r.standby_days|num if r.standby_days is not none else '—' }}</td>
+          <td class="py-1 text-right">{{ r.amount|num }}</td>
+          <td class="py-1 text-slate-500">{{ r.note }}</td>
+          {% if is_admin %}
+          <td class="py-1 text-right whitespace-nowrap">
+            <button type="submit" form="revenue-delete-{{ r.id }}" class="text-red-700 hover:underline text-xs">✕</button>
+          </td>
+          {% endif %}
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if is_admin %}
+    {% for r in revenue_history %}
+    {% if not r.customer_id %}
+    <form id="revenue-edit-{{ r.id }}" method="post" action="{{ url_for('tools.edit_revenue', tool_id=tool.id, revenue_id=r.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+    {% endif %}
+    <form id="revenue-delete-{{ r.id }}" method="post" action="{{ url_for('tools.delete_revenue', tool_id=tool.id, revenue_id=r.id) }}" onsubmit="return confirm('Удалить эту запись о выручке?{% if r.customer_id %} Перенесённая ею наработка будет откачена.{% endif %}');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+    {% endfor %}
+    {% endif %}
+    {% else %}
+    <p class="text-sm text-slate-400">Выручка ещё не вносилась.</p>
+    {% endif %}
+    {% if can_edit %}
+    <form method="post" action="{{ url_for('tools.add_revenue', tool_id=tool.id) }}" id="revenue-add-form" class="mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div><label class="block text-xs text-slate-500 mb-1">Дата *</label><input type="date" name="revenue_date" required class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Заказчик</label>
+        <select name="customer_id" id="revenue-customer-select" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
+          <option value="">Без заказчика (вручную)</option>
+          {% for c in customers %}
+          <option value="{{ c.id }}">{{ c.name }}{% if c.contract_number %} ({{ c.contract_number }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div id="revenue-manual-fields" class="col-span-2 grid grid-cols-2 gap-3">
+        <div><label class="block text-xs text-slate-500 mb-1">Сумма, ₽ *</label><input type="number" step="0.01" name="amount" id="revenue-amount-input" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
+      </div>
+      <div id="revenue-customer-fields" class="col-span-2 grid grid-cols-3 gap-3 hidden">
+        <div><label class="block text-xs text-slate-500 mb-1">№ скважины</label><input name="well_number" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
+        <div><label class="block text-xs text-slate-500 mb-1">Работа, ч</label><input type="number" step="0.1" name="work_hours" id="revenue-hours-input" value="0" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
+        <div><label class="block text-xs text-slate-500 mb-1">Дежурство, сут</label><input type="number" step="0.1" name="standby_days" id="revenue-standby-input" value="0" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
+        <p class="col-span-3 text-xs text-slate-400" id="revenue-computed-preview">Сумма будет рассчитана автоматически по ставкам заказчика; часы работы перенесутся в наработку инструмента.</p>
+      </div>
+      <div class="col-span-2"><label class="block text-xs text-slate-500 mb-1">Примечание</label><input name="note" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
+      <div class="col-span-2"><button class="bg-slate-900 text-white rounded-lg px-4 py-2 text-sm hover:bg-slate-800">Добавить выручку</button></div>
+    </form>
+    <script>
+      (function () {
+        var rates = {{ customers_json|safe }};
+        var select = document.getElementById('revenue-customer-select');
+        var manualFields = document.getElementById('revenue-manual-fields');
+        var customerFields = document.getElementById('revenue-customer-fields');
+        var amountInput = document.getElementById('revenue-amount-input');
+        var hoursInput = document.getElementById('revenue-hours-input');
+        var standbyInput = document.getElementById('revenue-standby-input');
+        var preview = document.getElementById('revenue-computed-preview');
+
+        function updatePreview() {
+          var rate = rates[select.value];
+          if (!rate) return;
+          var hours = parseFloat(hoursInput.value) || 0;
+          var standby = parseFloat(standbyInput.value) || 0;
+          var amount = hours * rate.work_rate + standby * rate.standby_rate;
+          preview.textContent = 'Расчётная сумма: ' + amount.toFixed(2) + ' ₽ (ставки: ' +
+            rate.work_rate + ' ₽/ч, ' + rate.standby_rate + ' ₽/сутки).';
+        }
+
+        function toggleMode() {
+          if (select.value) {
+            manualFields.classList.add('hidden');
+            customerFields.classList.remove('hidden');
+            amountInput.required = false;
+            updatePreview();
+          } else {
+            manualFields.classList.remove('hidden');
+            customerFields.classList.add('hidden');
+            amountInput.required = true;
+          }
+        }
+
+        select.addEventListener('change', toggleMode);
+        hoursInput.addEventListener('input', updatePreview);
+        standbyInput.addEventListener('input', updatePreview);
+        toggleMode();
+      })();
+    </script>
+    {% endif %}
+  </div>
+
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <h2 class="font-semibold mb-3">Ремонтные / сборочные работы по этому инструменту</h2>
+    {% if jobs %}
+    <table class="w-full text-sm">
+      <thead class="text-slate-500 text-left"><tr><th class="py-1">Дата</th><th class="py-1">Название</th><th class="py-1 text-right">Итого, ₽</th></tr></thead>
+      <tbody>
+        {% for j in jobs %}
+        <tr class="border-t border-slate-100">
+          <td class="py-1"><a href="{{ url_for('jobs.detail', job_id=j.id) }}" class="text-blue-700 hover:underline">{{ j.job_date }}</a></td>
+          <td class="py-1 text-slate-500">{{ j.title or '—' }}</td>
+          <td class="py-1 text-right">{{ j.total_cost|num }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-sm text-slate-400">Работ по этому инструменту пока не было.</p>
+    {% endif %}
+    <p class="text-xs text-slate-400 mt-3">Чтобы привязать новую работу к этому инструменту, выберите его при создании работы в разделе «Сервис».</p>
+  </div>
+</div>
+
+{% if cumulative %}
+<script>
+  const ctx = document.getElementById('toolHoursChart');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: {{ cumulative|map(attribute='date')|list|tojson }},
+      datasets: [{
+        label: 'Наработка инструмента, ч (накопительно)',
+        data: {{ cumulative|map(attribute='hours')|list|tojson }},
+        borderColor: '#eb6834',
+        backgroundColor: 'rgba(235,104,52,0.1)',
+        borderWidth: 2,
+        pointRadius: 3,
+        pointBackgroundColor: '#eb6834',
+        fill: true,
+        tension: 0.2,
+      }]
+    },
+    options: {
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, grid: { color: '#f0efec' } }, x: { grid: { display: false } } }
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}

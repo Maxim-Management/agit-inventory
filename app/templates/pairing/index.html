@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}Подбор пары ротор-статор — AGIT tool and components track{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <h1 class="text-2xl font-semibold">Сервис</h1>
+  <div class="flex gap-4 text-sm text-slate-500 mt-2">
+    <a href="{{ url_for('jobs.list_view') }}" class="hover:text-slate-900 pb-1">Работы и затраты</a>
+    <span class="font-medium text-slate-900 border-b-2 border-slate-900 pb-1">Подбор пар</span>
+  </div>
+</div>
+<h2 class="text-lg font-semibold text-slate-700 mb-1">Подбор пары ротор / статор</h2>
+<p class="text-sm text-slate-500 mb-6">Оптимальное сопоставление по зазору OD (ротор) / ID (статор) в диапазоне {{ gap_min }}–{{ gap_max }} мм.</p>
+
+<form method="get" class="flex flex-wrap items-end gap-3 mb-6">
+  <div>
+    <label class="block text-xs text-slate-500 mb-1">Типоразмер</label>
+    <select name="tool_size" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      <option value="">Все</option>
+      {% for ts in tool_sizes %}
+      <option value="{{ ts }}" {{ 'selected' if ts == tool_size }}>{{ ts }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-xs text-slate-500 mb-1">Мин. зазор, мм</label>
+    <input type="number" step="0.01" name="gap_min" value="{{ gap_min }}" class="border border-slate-300 rounded-lg px-3 py-2 text-sm w-24">
+  </div>
+  <div>
+    <label class="block text-xs text-slate-500 mb-1">Макс. зазор, мм</label>
+    <input type="number" step="0.01" name="gap_max" value="{{ gap_max }}" class="border border-slate-300 rounded-lg px-3 py-2 text-sm w-24">
+  </div>
+  <button class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm">Пересчитать</button>
+</form>
+
+<div class="grid md:grid-cols-3 gap-4 mb-8">
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Роторов на складе</div>
+    <div class="text-2xl font-semibold">{{ rotors|length }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Статоров на складе</div>
+    <div class="text-2xl font-semibold">{{ stators|length }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Найдено оптимальных пар</div>
+    <div class="text-2xl font-semibold text-green-700">{{ suggestions|length }}</div>
+  </div>
+</div>
+
+<h2 class="font-semibold mb-3">Рекомендуемые пары</h2>
+<div class="bg-white border border-slate-200 rounded-xl overflow-hidden mb-8">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-slate-500 text-left">
+    <tr><th class="px-4 py-2">Ротор (OD, мм)</th><th class="px-4 py-2">Статор (ID, мм)</th><th class="px-4 py-2 text-right">Зазор, мм</th><th class="px-4 py-2">Оценка</th><th class="px-4 py-2"></th></tr>
+  </thead>
+  <tbody>
+    {% for s in suggestions %}
+    <tr class="border-t border-slate-100 hover:bg-slate-50">
+      <td class="px-4 py-2">{{ s.rotor.serial_number }} <span class="text-slate-400">(OD {{ s.rotor.od_mm|num(3) }})</span></td>
+      <td class="px-4 py-2">{{ s.stator.serial_number }} <span class="text-slate-400">(ID {{ s.stator.id_mm|num(3) }})</span></td>
+      <td class="px-4 py-2 text-right font-medium">{{ s.gap_mm|num(3) }}</td>
+      <td class="px-4 py-2">
+        <span class="px-2 py-0.5 rounded text-xs {{ 'bg-green-50 text-green-700' if s.quality=='оптимально' else ('bg-blue-50 text-blue-700' if s.quality=='хорошо' else 'bg-amber-50 text-amber-700') }}">{{ s.quality }}</span>
+      </td>
+      <td class="px-4 py-2 text-right">
+        {% if can_edit %}
+        <form method="post" action="{{ url_for('pairing.confirm') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="rotor_unit_id" value="{{ s.rotor.id }}">
+          <input type="hidden" name="stator_unit_id" value="{{ s.stator.id }}">
+          <button class="text-blue-700 hover:underline text-sm">Подтвердить пару</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">Нет доступных пар в заданном диапазоне зазора.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<div class="grid md:grid-cols-2 gap-6 mb-8">
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <h2 class="font-semibold mb-3">Роторы без пары ({{ unmatched_rotors|length }})</h2>
+    {% if unmatched_rotors %}
+    <table class="w-full text-sm">
+      <thead class="text-slate-500 text-left"><tr><th class="py-1">Серийный №</th><th class="py-1 text-right">OD, мм</th></tr></thead>
+      <tbody>
+      {% for r in unmatched_rotors %}
+        <tr class="border-t border-slate-100"><td class="py-1">{{ r.serial_number }}</td><td class="py-1 text-right">{{ r.od_mm|num(3) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-sm text-slate-400">Все роторы подобраны.</p>
+    {% endif %}
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <h2 class="font-semibold mb-3">Статоры без пары ({{ unmatched_stators|length }})</h2>
+    {% if unmatched_stators %}
+    <table class="w-full text-sm">
+      <thead class="text-slate-500 text-left"><tr><th class="py-1">Серийный №</th><th class="py-1 text-right">ID, мм</th></tr></thead>
+      <tbody>
+      {% for s in unmatched_stators %}
+        <tr class="border-t border-slate-100"><td class="py-1">{{ s.serial_number }}</td><td class="py-1 text-right">{{ s.id_mm|num(3) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-sm text-slate-400">Все статоры подобраны.</p>
+    {% endif %}
+  </div>
+</div>
+
+<h2 class="font-semibold mb-3">История подтверждённых пар</h2>
+<div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-slate-500 text-left"><tr><th class="px-4 py-2">Ротор</th><th class="px-4 py-2">Статор</th><th class="px-4 py-2 text-right">Зазор, мм</th><th class="px-4 py-2">Дата</th></tr></thead>
+  <tbody>
+    {% for h in history %}
+    <tr class="border-t border-slate-100"><td class="px-4 py-2">{{ h.rotor_sn }}</td><td class="px-4 py-2">{{ h.stator_sn }}</td><td class="px-4 py-2 text-right">{{ h.gap_mm|num(3) }}</td><td class="px-4 py-2 text-slate-500">{{ h.created_at }}</td></tr>
+    {% else %}
+    <tr><td colspan="4" class="px-4 py-6 text-center text-slate-400">Пар пока не подтверждено.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

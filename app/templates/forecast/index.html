@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Прогноз заказа — AGIT tool and components track{% endblock %}
+{% block content %}
+<a href="{{ url_for('parts.list_parts') }}" class="text-sm text-blue-700 hover:underline">&larr; К разделу «Комплектующие»</a>
+<div class="flex items-center justify-between mb-1 mt-2">
+  <h1 class="text-2xl font-semibold">Прогноз заказа на 3 месяца вперёд</h1>
+  <a href="{{ url_for('forecast.export_csv', lookback_months=lookback_months) }}" class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm hover:bg-slate-200">Скачать CSV</a>
+</div>
+<p class="text-sm text-slate-500 mb-6">
+  Расчёт: средний месячный расход (по списаниям за последние {{ lookback_months }} мес.) × 3 месяца, минус текущий остаток, с учётом неснижаемого запаса.
+  Рекомендовано к заказу: <span class="font-semibold text-slate-800">{{ total_recommended }} шт</span>.
+</p>
+
+<form method="get" class="flex items-end gap-3 mb-6">
+  <div>
+    <label class="block text-xs text-slate-500 mb-1">Глубина анализа истории, мес.</label>
+    <input type="number" name="lookback_months" value="{{ lookback_months }}" class="border border-slate-300 rounded-lg px-3 py-2 text-sm w-32">
+  </div>
+  <button class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm">Пересчитать</button>
+</form>
+
+<div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-slate-500 text-left">
+    <tr>
+      <th class="px-4 py-2">Деталь</th>
+      <th class="px-4 py-2">Типоразмер</th>
+      <th class="px-4 py-2 text-right">Расход/мес.</th>
+      <th class="px-4 py-2 text-right">Потребность на 3 мес.</th>
+      <th class="px-4 py-2 text-right">Остаток</th>
+      <th class="px-4 py-2 text-right">Мин. остаток</th>
+      <th class="px-4 py-2 text-right">Заказать</th>
+      <th class="px-4 py-2">Приоритет</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in results %}
+    <tr class="border-t border-slate-100 hover:bg-slate-50 {{ 'bg-red-50/40' if r.recommended_order_qty > 0 }}">
+      <td class="px-4 py-2"><a href="{{ url_for('parts.detail', part_id=r.part.id) }}" class="text-blue-700 hover:underline">{{ r.part.part_name }}</a> <span class="text-slate-400">({{ r.part.part_number }})</span></td>
+      <td class="px-4 py-2 text-slate-500">{{ r.part.tool_size }}</td>
+      <td class="px-4 py-2 text-right">{{ r.avg_monthly_consumption|num }}</td>
+      <td class="px-4 py-2 text-right">{{ r.projected_need_3mo|num }}</td>
+      <td class="px-4 py-2 text-right">{{ r.current_stock|num }}</td>
+      <td class="px-4 py-2 text-right text-slate-400">{{ r.min_stock_qty }}</td>
+      <td class="px-4 py-2 text-right font-semibold {{ 'text-red-600' if r.recommended_order_qty > 0 else 'text-slate-400' }}">{{ r.recommended_order_qty }}</td>
+      <td class="px-4 py-2">
+        <span class="px-2 py-0.5 rounded text-xs {{ 'bg-red-50 text-red-700' if r.priority=='высокий' else ('bg-amber-50 text-amber-700' if r.priority=='средний' else 'bg-slate-100 text-slate-500') }}">{{ r.priority }}</span>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="8" class="px-4 py-6 text-center text-slate-400">Нет деталей в справочнике.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Отчёт по затратам — AGIT tool and components track{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-semibold">Отчёт по списанным компонентам и затратам</h1>
+  <a href="{{ url_for('jobs.export_report_csv', job_type=job_type, date_from=date_from, date_to=date_to) }}" class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm hover:bg-slate-200">Скачать CSV</a>
+</div>
+
+<form method="get" class="flex flex-wrap gap-3 mb-6">
+  <select name="job_type" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+    <option value="">Все типы</option>
+    {% for k, v in job_type_labels.items() %}
+    <option value="{{ k }}" {{ 'selected' if job_type==k }}>{{ v }}</option>
+    {% endfor %}
+  </select>
+  <input type="date" name="date_from" value="{{ date_from or '' }}" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  <input type="date" name="date_to" value="{{ date_to or '' }}" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  <button class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm">Применить</button>
+</form>
+
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Работ</div>
+    <div class="text-2xl font-semibold mt-1">{{ totals.jobs_count }}</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Детали</div>
+    <div class="text-2xl font-semibold mt-1">{{ totals.parts_cost|num }} ₽</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Сервисный центр</div>
+    <div class="text-2xl font-semibold mt-1">{{ totals.service_center_cost|num }} ₽</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Персонал</div>
+    <div class="text-2xl font-semibold mt-1">{{ totals.labor_cost|num }} ₽</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Итого</div>
+    <div class="text-2xl font-semibold mt-1 text-blue-700">{{ totals.total_cost|num }} ₽</div>
+  </div>
+</div>
+
+<div class="bg-white border border-slate-200 rounded-xl p-5 mb-8">
+  <h2 class="font-semibold mb-3">По типу работы</h2>
+  {% if by_type %}
+  <canvas id="typeChart" height="90"></canvas>
+  {% else %}
+  <p class="text-sm text-slate-400">Нет данных за выбранный период.</p>
+  {% endif %}
+</div>
+
+<h2 class="font-semibold mb-3">Работы за период</h2>
+<div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-slate-500 text-left">
+    <tr>
+      <th class="px-4 py-2">Дата</th><th class="px-4 py-2">Тип</th><th class="px-4 py-2">Название</th>
+      <th class="px-4 py-2 text-right">Итого, ₽</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for j in jobs %}
+    <tr class="border-t border-slate-100 hover:bg-slate-50">
+      <td class="px-4 py-2"><a href="{{ url_for('jobs.detail', job_id=j.id) }}" class="text-blue-700 hover:underline">{{ j.job_date }}</a></td>
+      <td class="px-4 py-2">{{ job_type_labels.get(j.job_type, j.job_type) }}</td>
+      <td class="px-4 py-2 text-slate-500">{{ j.title or j.tool_assembly or '—' }}</td>
+      <td class="px-4 py-2 text-right font-medium">{{ j.total_cost|num }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4" class="px-4 py-6 text-center text-slate-400">Нет данных.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if by_type %}
+<script>
+  new Chart(document.getElementById('typeChart'), {
+    type: 'bar',
+    data: {
+      labels: [{% for k, v in by_type.items() %}"{{ job_type_labels.get(k, k) }}",{% endfor %}],
+      datasets: [{
+        label: 'Итого, ₽',
+        data: [{% for k, v in by_type.items() %}{{ v.total_cost }},{% endfor %}],
+        backgroundColor: '#2a78d6',
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, grid: { color: '#f0efec' } }, y: { grid: { display: false } } }
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Новый пользователь — AGIT tool and components track{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Новый пользователь</h1>
+<form method="post" class="bg-white border border-slate-200 rounded-xl p-6 max-w-lg space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Email *</label>
+    <input type="email" name="email" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Имя</label>
+    <input name="full_name" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Роль</label>
+    <select name="role" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      {% for k, v in role_labels.items() %}
+      <option value="{{ k }}">{{ v }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Временный пароль</label>
+    <input name="password" placeholder="Оставьте пустым, чтобы сгенерировать автоматически" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  </div>
+  <button class="bg-slate-900 text-white rounded-lg px-5 py-2.5 text-sm font-medium hover:bg-slate-800">Создать</button>
+</form>
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Списание {{ unit.serial_number }} — AGIT tool and components track{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-1">Списание компонента</h1>
+<p class="text-sm text-slate-500 mb-6">{{ unit.serial_number }} · {{ unit.part_name }} ({{ unit.part_number }})</p>
+
+<form method="post" class="bg-white border border-slate-200 rounded-xl p-6 max-w-lg space-y-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Дата списания *</label>
+    <input type="date" name="write_off_date" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-2">Причина списания *</label>
+    <div class="space-y-2">
+      <label class="flex items-center gap-2 text-sm"><input type="radio" name="reason" value="repair" required> Ремонт</label>
+      <label class="flex items-center gap-2 text-sm"><input type="radio" name="reason" value="defect"> Брак</label>
+      <label class="flex items-center gap-2 text-sm"><input type="radio" name="reason" value="damage"> Повреждение</label>
+      <label class="flex items-center gap-2 text-sm"><input type="radio" name="reason" value="other"> Другое</label>
+    </div>
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Привязать к ремонтной/сборочной работе</label>
+    <select name="job_id" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      <option value="">Не привязывать</option>
+      {% for j in recent_jobs %}
+      <option value="{{ j.id }}">{{ j.job_date }} · {{ j.title or j.tool_assembly or ('работа #' ~ j.id) }}</option>
+      {% endfor %}
+    </select>
+    <p class="text-xs text-slate-400 mt-1">Нужно для отчёта по затратам — <a href="{{ url_for('jobs.new_job') }}" class="text-blue-700 hover:underline">создать новую работу</a>.</p>
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Номер и дата акта списания</label>
+    <input name="act_number" placeholder="#1 / 11.06.2026" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Комментарий</label>
+    <textarea name="note" rows="3" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
+  </div>
+  <button class="bg-red-600 text-white rounded-lg px-5 py-2.5 text-sm font-medium hover:bg-red-700">Списать компонент</button>
+</form>
+{% endblock %}

@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Работа №{{ job.id }} — AGIT tool and components track{% endblock %}
+{% block content %}
+<a href="{{ url_for('jobs.list_view') }}" class="text-sm text-blue-700 hover:underline">&larr; К ремонтным работам</a>
+<h1 class="text-2xl font-semibold mt-2 mb-1">{{ job.title or (job_type_labels.get(job.job_type, job.job_type) + ' — ' + job.job_date) }}</h1>
+<p class="text-sm text-slate-500 mb-1">
+  {{ job_type_labels.get(job.job_type, job.job_type) }} · {{ job.job_date }}
+  {% if job.tool_serial %}· инструмент <a href="{{ url_for('tools.detail', tool_id=job.tool_id) }}" class="text-blue-700 hover:underline">{{ job.tool_serial }}</a>{% endif %}
+</p>
+<p class="text-sm text-slate-500 mb-6">
+  {% if job.work_order_number %}Наряд-заказ № {{ job.work_order_number }}{% endif %}
+  {% if job.performed_by %}{% if job.work_order_number %} · {% endif %}исполнитель: {{ job.performed_by }}{% endif %}
+  {% if job.service_center %}{% if job.work_order_number or job.performed_by %} · {% endif %}сервисный центр: {{ job.service_center }}{% endif %}
+</p>
+
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Детали</div>
+    <div class="text-xl font-semibold mt-1">{{ job.parts_cost|num }} ₽</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Стоимость сервисного центра</div>
+    <div class="text-xl font-semibold mt-1">{{ job.service_center_cost|num }} ₽</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Персонал</div>
+    <div class="text-xl font-semibold mt-1">{{ job.labor_cost|num }} ₽</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Прочее</div>
+    <div class="text-xl font-semibold mt-1">{{ job.other_cost|num }} ₽</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Итого</div>
+    <div class="text-xl font-semibold mt-1 text-blue-700">{{ job.total_cost|num }} ₽</div>
+  </div>
+</div>
+
+<div class="grid md:grid-cols-2 gap-6 mb-6">
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <h2 class="font-semibold mb-3">Списанные компоненты</h2>
+    {% if write_offs %}
+    <table class="w-full text-sm">
+      <thead class="text-slate-500 text-left"><tr><th class="py-1">Деталь</th><th class="py-1">Серийный №/кол-во</th><th class="py-1">Причина</th><th class="py-1 text-right">Стоимость, ₽</th></tr></thead>
+      <tbody>
+        {% for w in write_offs %}
+        <tr class="border-t border-slate-100">
+          <td class="py-1">{{ w.part_name }}</td>
+          <td class="py-1 text-slate-500">{{ w.serial_number if w.serial_number else (w.quantity|num) + ' шт' }}</td>
+          <td class="py-1">{{ reason_labels.get(w.reason, w.reason) }}</td>
+          <td class="py-1 text-right">{{ w.line_cost_rub|num }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-sm text-slate-400">Компоненты ещё не списаны на эту работу.</p>
+    {% endif %}
+
+    {% if can_edit %}
+    <div class="mt-4 pt-4 border-t border-slate-100 space-y-4">
+      <div>
+        <p class="text-xs font-medium text-slate-500 mb-2">Списать серийный компонент</p>
+        <form method="get" class="flex gap-2 mb-2">
+          <input type="text" name="q" value="{{ q }}" placeholder="Серийный № или название" class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm flex-1">
+          <button class="bg-slate-100 border border-slate-300 rounded-lg px-3 py-1.5 text-sm">Найти</button>
+        </form>
+        {% for c in unit_candidates %}
+        <div class="flex items-center gap-2 text-sm border-t border-slate-100 py-1.5">
+          <span class="flex-1">{{ c.serial_number }} — {{ c.part_name }}{% if c.status == 'installed' %} <span class="text-orange-600 text-xs">(установлен)</span>{% endif %}</span>
+          <form method="post" action="{{ url_for('jobs.consume_unit', job_id=job.id) }}" class="inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="unit_id" value="{{ c.id }}">
+            <input type="hidden" name="write_off_date" value="{{ job.job_date }}">
+            <input type="hidden" name="reason" value="repair">
+            <button class="text-blue-700 hover:underline">Списать</button>
+          </form>
+          {% if c.status == 'installed' %}
+          <form method="post" action="{{ url_for('jobs.transfer_unit', job_id=job.id) }}" class="inline" onsubmit="return confirm('Снять компонент с инструмента и вернуть на склад без списания?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="unit_id" value="{{ c.id }}">
+            <button class="text-slate-600 hover:underline">Перевести на склад</button>
+          </form>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      <div>
+        <p class="text-xs font-medium text-slate-500 mb-2">Списать расходник по количеству</p>
+        <form method="post" action="{{ url_for('jobs.consume_bulk', job_id=job.id) }}" class="flex flex-wrap items-center gap-2 text-sm">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="write_off_date" value="{{ job.job_date }}">
+          <select name="part_id" id="bulk_part_id" class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm flex-1">
+            {% for p in bulk_parts %}
+            <option value="{{ p.id }}">{{ p.part_name }} ({{ p.part_number }})</option>
+            {% endfor %}
+          </select>
+          <select name="receipt_id" id="bulk_receipt_id" class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm w-full sm:w-auto"></select>
+          <input type="number" step="0.01" name="quantity" value="1" class="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
+          <select name="reason" class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
+            {% for k, v in reason_labels.items() %}
+            <option value="{{ k }}" {{ 'selected' if k=='repair' }}>{{ v }}</option>
+            {% endfor %}
+          </select>
+          <button class="bg-slate-900 text-white rounded-lg px-3 py-1.5 text-sm hover:bg-slate-800">Списать</button>
+        </form>
+        <p class="text-xs text-slate-400 mt-1">По умолчанию списывается с самой старой партии с остатком (FIFO) — можно выбрать другую.</p>
+        <script>
+          (function () {
+            const batchesByPart = {{ batches_by_part_json|safe }};
+            const partSelect = document.getElementById('bulk_part_id');
+            const receiptSelect = document.getElementById('bulk_receipt_id');
+            function refreshBatches() {
+              const batches = batchesByPart[partSelect.value] || [];
+              receiptSelect.innerHTML = '';
+              if (!batches.length) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.textContent = 'Нет открытых партий — без привязки';
+                receiptSelect.appendChild(opt);
+                return;
+              }
+              batches.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b.id;
+                opt.textContent = b.label;
+                receiptSelect.appendChild(opt);
+              });
+            }
+            partSelect.addEventListener('change', refreshBatches);
+            refreshBatches();
+          })();
+        </script>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="bg-white border border-slate-200 rounded-xl p-5">
+    <h2 class="font-semibold mb-3">Прочие затраты</h2>
+    {% if is_admin %}
+    <form method="post" action="{{ url_for('jobs.edit_costs', job_id=job.id) }}" class="space-y-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Название работы</label>
+        <input name="title" value="{{ job.title }}" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Инструмент (серийный №) *</label>
+        <select name="tool_id" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+          {% for t in tools %}
+          <option value="{{ t.id }}" {{ 'selected' if job.tool_id == t.id }}>{{ t.serial_number }}{% if t.tool_size %} ({{ t.tool_size }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="grid grid-cols-3 gap-2">
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">Номер наряд-заказа</label>
+          <input name="work_order_number" value="{{ job.work_order_number }}" class="w-full border border-slate-300 rounded-lg px-2 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">Исполнитель (супервайзер)</label>
+          <input name="performed_by" value="{{ job.performed_by }}" class="w-full border border-slate-300 rounded-lg px-2 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">Сервисный центр</label>
+          <input name="service_center" value="{{ job.service_center }}" class="w-full border border-slate-300 rounded-lg px-2 py-2 text-sm">
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-2">
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">Стоимость сервисного центра, ₽</label>
+          <input type="number" step="0.01" name="service_center_cost" value="{{ job.service_center_cost }}" class="w-full border border-slate-300 rounded-lg px-2 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">Персонал, ₽</label>
+          <input type="number" step="0.01" name="labor_cost" value="{{ job.labor_cost }}" class="w-full border border-slate-300 rounded-lg px-2 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-500 mb-1">Прочее, ₽</label>
+          <input type="number" step="0.01" name="other_cost" value="{{ job.other_cost }}" class="w-full border border-slate-300 rounded-lg px-2 py-2 text-sm">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-500 mb-1">Комментарий</label>
+        <textarea name="note" rows="3" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">{{ job.note }}</textarea>
+      </div>
+      <button class="bg-slate-900 text-white rounded-lg px-4 py-2 text-sm hover:bg-slate-800">Сохранить</button>
+    </form>
+    <form method="post" action="{{ url_for('jobs.delete_job', job_id=job.id) }}" class="mt-4 pt-4 border-t border-slate-100" onsubmit="return confirm('Удалить эту работу? Все списанные на неё комплектующие будут возвращены на склад (записи списания удалятся).');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="text-red-700 hover:underline text-sm">Удалить работу</button>
+    </form>
+    {% else %}
+    <p class="text-sm text-slate-600">{{ job.note or '—' }}</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

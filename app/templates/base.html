@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}AGIT tool and components track{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .status-in_stock { background:#e6f4ea; color:#0f6b2c; }
+    .status-installed { background:#e8f0fe; color:#1a56cc; }
+    .status-paired { background:#fdf0e0; color:#a3560a; }
+    .status-written_off { background:#fbe9e9; color:#a32424; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col">
+  {% if current_user %}
+  <nav class="bg-slate-900 text-slate-100">
+    <div class="max-w-[1600px] mx-auto px-4 xl:px-8">
+      <div class="flex items-center justify-between h-14 gap-4">
+        <div class="flex items-center gap-6 min-w-0">
+          <a href="{{ url_for('dashboard.index') }}" class="font-semibold tracking-wide whitespace-nowrap shrink-0">AGIT tool and components track</a>
+          <div class="hidden lg:flex gap-4 text-sm text-slate-300">
+            <a href="{{ url_for('dashboard.index') }}" class="hover:text-white">Обзор</a>
+            <a href="{{ url_for('parts.list_parts') }}" class="hover:text-white">Комплектующие</a>
+            <a href="{{ url_for('tools.list_view') }}" class="hover:text-white">Инструменты</a>
+            <a href="{{ url_for('receipts.list_receipts') }}" class="hover:text-white">Поступления</a>
+            <a href="{{ url_for('writeoffs.list_writeoffs') }}" class="hover:text-white">Списания</a>
+            <a href="{{ url_for('jobs.list_view') }}" class="hover:text-white">Сервис</a>
+            <a href="{{ url_for('analytics.index') }}" class="hover:text-white">Аналитика</a>
+            {% if current_user.role == 'admin' %}
+            <a href="{{ url_for('admin.users') }}" class="hover:text-white">Пользователи</a>
+            {% endif %}
+          </div>
+        </div>
+        <div class="flex items-center gap-3 text-sm text-slate-300">
+          <a href="{{ url_for('auth.change_password') }}" class="hover:text-white">{{ current_user.full_name or current_user.email }} · {{ role_labels[current_user.role] }}</a>
+          <a href="{{ url_for('auth.logout') }}" class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-white">Выйти</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+  {% endif %}
+
+  <main class="flex-1 max-w-[1600px] mx-auto w-full px-4 xl:px-8 py-6">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="mb-4 space-y-2">
+        {% for category, message in messages %}
+          <div class="px-4 py-2 rounded text-sm {{ 'bg-red-50 text-red-700 border border-red-200' if category == 'error' else 'bg-green-50 text-green-700 border border-green-200' }}">
+            {{ message }}
+          </div>
+        {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="text-center text-xs text-slate-400 py-4">AGIT tool and components track · Внутренний сервис учёта запчастей и компонентов осциллятора</footer>
+</body>
+</html>
