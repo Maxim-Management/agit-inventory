@@ -9,7 +9,7 @@ from .auth import login_required, roles_required
 from .jobs import list_jobs, job_totals, job_write_offs, JOB_TYPE_LABELS
 from .analytics import REASON_LABELS
 from . import tools as tools_mod
-from .stock import consume_from_batch, open_batches_for_part
+from .stock import consume_from_batch, open_batches_for_part, batch_label
 
 bp = Blueprint("jobs", __name__, url_prefix="/jobs")
 
@@ -115,7 +115,7 @@ def detail(job_id):
         [False],
     )
     batches_by_part_json = json.dumps({str(p["id"]): [
-        {"id": b["id"], "label": f"{b.get('batch_serial_number') or ('партия #' + str(b['id']))} · "
+        {"id": b["id"], "label": f"{batch_label(b)} · "
                                   f"{b.get('receipt_date') or ''} · остаток {float(b['remaining_quantity']):g}"}
         for b in open_batches_for_part(p["id"])
     ] for p in bulk_parts})

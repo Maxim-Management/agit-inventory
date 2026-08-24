@@ -88,13 +88,22 @@ def open_batches_for_part(part_id):
     Таможенная пошлина берётся из карточки детали (parts.customs_duty_percent),
     а не из партии — она одна и та же для всех партий этой позиции."""
     return db.query_all(
-        """SELECT r.id, r.batch_serial_number, r.receipt_date, r.quantity, r.remaining_quantity,
+        """SELECT r.id, r.order_ref, r.date_mfg, r.receipt_date, r.quantity, r.remaining_quantity,
                   r.exchange_rate, p.customs_duty_percent, r.total_cost_cny, r.transfer_price_rub
            FROM receipts r JOIN parts p ON p.id = r.part_id
            WHERE r.part_id = %s AND r.remaining_quantity > 0
            ORDER BY r.receipt_date, r.id""",
         [part_id],
     )
+
+
+def batch_label(b):
+    """Читаемая метка партии для выпадающих списков при списании — партия
+    больше не имеет отдельного номера (см. миграцию 0012), поэтому
+    идентифицируется номером заказа и датой производства; если ни того, ни
+    другого нет — запасной вариант "партия #id"."""
+    parts_ = [p for p in [b.get("order_ref"), b.get("date_mfg")] if p]
+    return " / ".join(parts_) if parts_ else ("партия #" + str(b["id"]))
 
 
 def consume_from_batch(receipt_id, qty):
@@ -176,3 +185,27 @@ def avg_exchange_rate_all_receipts(part_id):
     if not row or not row["cnt"]:
         return None
     return float(row["avg_rate"])
+
+
+def guaranteed_resource_hours(part_id):
+    """"Гарантированный ресурс" компонента, ч — сколько наработки в среднем
+    выдерживает деталь до списания по износу/выходу из строя. Считается
+    вживую (по аналогии с part_stock_value) как средняя наработка
+    (units.circulation_hours) на момент списания среди списаний ЭТОЙ детали
+    с причиной "ремонт" (write_offs.reason = 'repair') — то есть именно
+    ремонт по факту износа/поломки, а не заводской брак ('defect') или
+    механическое повреждение ('damage'). Наработка серийной единицы после
+    списания больше не меняется (единица снята с эксплуатации), поэтому
+    circulation_hours на этот момент и есть её "стаж" до выбытия.
+    Возвращает None, если по этой детали ещё не было ни одного такого
+    списания серийной единицы (для несерийных расходников понятие
+    "гарантированного ресурса" неприменимо — там нет units.circulation_hours)."""
+    row = db.query_one(
+        """SELECT AVG(u.circulation_hours) AS avg_h, COUNT(*) AS cnt
+           FROM write_offs w JOIN units u ON u.id = w.unit_id
+           WHERE w.part_id = %s AND w.reason = 'repair' AND w.unit_id IS NOT NULL""",
+        [part_id],
+    )
+    if not row or not row["cnt"]:
+        return None
+    return round(float(row["avg_h"]), 2)

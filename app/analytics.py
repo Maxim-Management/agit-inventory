@@ -141,15 +141,20 @@ def forecast_orders(lookback_months=6, horizon_months=3):
 
 def ops_report(date_from=None, date_to=None):
     """Сводный отчёт для «Аналитики»: остаток комплектующих на складе,
-    средняя наработка на инструмент, средняя наработка на компонент, общая
-    выручка на все инструменты, общие затраты (по работам/ремонтам).
+    средняя наработка на инструмент, общая выручка на все инструменты,
+    общие затраты (по работам/ремонтам).
 
     Остаток склада и средняя наработка — всегда на текущий момент (снимок,
     без фильтра по датам): наработка и остаток — это накопленное состояние,
     а не событие с датой, которое имело бы смысл резать по периоду.
     Выручка и затраты, наоборот, считаются за выбранный период (date_from/
     date_to, оба включительно) — как в аналогичном отчёте по работам в
-    разделе «Сервис» (app/routes_jobs.py: report())."""
+    разделе «Сервис» (app/routes_jobs.py: report()).
+
+    Средняя наработка на компонент сюда намеренно НЕ входит (убрана из
+    отчёта по просьбе пользователя) — расшифровка по каждому серийному
+    компоненту по-прежнему доступна отдельно через выгрузку CSV
+    (component_hours_report_rows() ниже)."""
     from .stock import total_stock_value
     from .jobs import list_jobs
 
@@ -162,10 +167,6 @@ def ops_report(date_from=None, date_to=None):
     )
     total_tool_hours = sum(float(r["s"] or 0) for r in tool_hours_rows)
     avg_tool_hours = round(total_tool_hours / tools_count, 2) if tools_count else 0.0
-
-    component_row = db.query_one("SELECT AVG(circulation_hours) AS avg_h, COUNT(*) AS c FROM units")
-    components_count = component_row["c"] if component_row else 0
-    avg_component_hours = round(float(component_row["avg_h"]), 2) if components_count and component_row["avg_h"] is not None else 0.0
 
     revenue_sql = "SELECT COALESCE(SUM(amount),0) AS s FROM tool_revenue WHERE 1=1"
     params = []
@@ -184,8 +185,6 @@ def ops_report(date_from=None, date_to=None):
         "stock_value_rub": round(stock_value_rub, 2),
         "tools_count": tools_count,
         "avg_tool_hours": avg_tool_hours,
-        "components_count": components_count,
-        "avg_component_hours": avg_component_hours,
         "total_revenue": total_revenue,
         "total_costs": total_costs,
         "net_result": round(total_revenue - total_costs, 2),

@@ -11,12 +11,13 @@
 <table class="w-full text-sm">
   <thead class="bg-slate-50 text-slate-500 text-left">
     <tr>
-      <th class="px-4 py-2">Дата</th><th class="px-4 py-2">Деталь</th><th class="px-4 py-2">Партия</th>
+      <th class="px-4 py-2">Дата</th><th class="px-4 py-2">Деталь</th>
       <th class="px-4 py-2">Серийные №</th>
-      <th class="px-4 py-2 text-right">Кол-во</th><th class="px-4 py-2 text-right">Остаток</th>
+      <th class="px-4 py-2 text-right" title="Фактически получено по этому заказу">Кол-во получено</th>
       <th class="px-4 py-2">Заказ</th>
       <th class="px-4 py-2">Дата произв.</th><th class="px-4 py-2 text-right" title="Пошлина — атрибут детали, одна для всех партий">Пошлина детали, %</th>
       <th class="px-4 py-2 text-right">Курс юаня</th><th class="px-4 py-2 text-right">Итого, CNY</th>
+      <th class="px-4 py-2 text-right">Вес, кг</th>
       <th class="px-4 py-2 text-right">Трансфер прайс, ₽</th>
       <th class="px-4 py-2 text-right">Стоимость за ед., ₽</th>
       <th class="px-4 py-2">Примечание</th>
@@ -27,7 +28,6 @@
     <tr class="border-t border-slate-100 hover:bg-slate-50">
       <td class="px-4 py-2">{{ r.receipt_date }}</td>
       <td class="px-4 py-2">{{ r.part_name }} <span class="text-slate-400">({{ r.part_number }})</span></td>
-      <td class="px-4 py-2 text-slate-500">{{ r.batch_serial_number if r.batch_serial_number and r.batch_serial_number != '-' else '—' }}</td>
       <td class="px-4 py-2 text-slate-500">
         {% if r.serials %}
         {{ r.serials|join(', ') }}
@@ -36,18 +36,18 @@
         {% endif %}
       </td>
       <td class="px-4 py-2 text-right">{{ r.quantity|num }}</td>
-      <td class="px-4 py-2 text-right {{ 'text-slate-300' if r.remaining_quantity == 0 }}">{{ r.remaining_quantity|num }}</td>
       <td class="px-4 py-2 text-slate-500">{{ r.order_ref }}</td>
       <td class="px-4 py-2 text-slate-500">{{ r.date_mfg or '—' }}</td>
       <td class="px-4 py-2 text-right">{{ r.customs_duty_percent|num if r.customs_duty_percent is not none else '—' }}</td>
       <td class="px-4 py-2 text-right">{{ r.exchange_rate|num if r.exchange_rate is not none else '—' }}</td>
       <td class="px-4 py-2 text-right">{{ r.total_cost_cny|num if r.total_cost_cny is not none else '—' }}</td>
+      <td class="px-4 py-2 text-right">{{ r.weight_kg|num(3) if r.weight_kg is not none else '—' }}</td>
       <td class="px-4 py-2 text-right">{{ r.transfer_price_rub|num if r.transfer_price_rub is not none else '—' }}</td>
       <td class="px-4 py-2 text-right font-medium">{{ r.unit_cost_rub|num }}</td>
       <td class="px-4 py-2 text-slate-500">{{ r.note }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="14" class="px-4 py-6 text-center text-slate-400">Поступлений пока нет.</td></tr>
+    <tr><td colspan="13" class="px-4 py-6 text-center text-slate-400">Поступлений пока нет.</td></tr>
     {% endfor %}
   </tbody>
 </table>

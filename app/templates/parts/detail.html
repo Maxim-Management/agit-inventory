@@ -25,6 +25,13 @@
     <div class="text-xs text-slate-500">Мин. неснижаемый остаток</div>
     <div class="text-2xl font-semibold">{{ part.min_stock_qty }}</div>
   </div>
+  {% if part.is_serialized %}
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500" title="Средняя наработка на момент списания по причине «ремонт» (износ/выход из строя)">Гарантированный ресурс, ч</div>
+    <div class="text-2xl font-semibold">{{ part.guaranteed_resource_hours|num if part.guaranteed_resource_hours is not none else '—' }}</div>
+    <div class="text-xs text-slate-400 mt-0.5">по списаниям с причиной «ремонт»</div>
+  </div>
+  {% endif %}
 </div>
 
 <div class="grid md:grid-cols-2 gap-4 mb-6">

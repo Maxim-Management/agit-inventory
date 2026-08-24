@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 
 from . import db
 from .auth import login_required, roles_required
-from .stock import stock_map, part_stock_value, avg_exchange_rate_all_receipts
+from .stock import stock_map, part_stock_value, avg_exchange_rate_all_receipts, guaranteed_resource_hours
 from .costing import part_unit_cost_rub
 
 bp = Blueprint("parts", __name__, url_prefix="/parts")
@@ -172,6 +172,7 @@ def detail(part_id):
     part["unit_cost_rub"] = part_unit_cost_rub(part)
     part["stock_value"] = part_stock_value(part_id)
     part["avg_exchange_rate_receipts"] = avg_exchange_rate_all_receipts(part_id)
+    part["guaranteed_resource_hours"] = guaranteed_resource_hours(part_id)
 
     units = db.query_all(
         "SELECT * FROM units WHERE part_id = %s ORDER BY status, serial_number", [part_id]
@@ -180,7 +181,7 @@ def detail(part_id):
     ledger = []
     if not part["is_serialized"]:
         receipts = db.query_all(
-            """SELECT receipt_date AS d, quantity AS qty, order_ref, note, batch_serial_number,
+            """SELECT receipt_date AS d, quantity AS qty, order_ref, note,
                       date_mfg, exchange_rate, total_cost_cny
                FROM receipts WHERE part_id = %s""",
             [part_id],

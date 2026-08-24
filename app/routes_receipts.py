@@ -65,64 +65,119 @@ def list_receipts():
     return render_template("receipts/list.html", receipts=receipts)
 
 
+def _f(value):
+    """float(value) с учётом того, что пустая строка из формы означает
+    "не заполнено" — возвращает None, а не бросает исключение."""
+    if value is None:
+        return None
+    value = value.strip() if isinstance(value, str) else value
+    if value == "":
+        return None
+    return float(value)
+
+
 @bp.route("/new", methods=("GET", "POST"))
 @roles_required("admin", "engineer")
 def new_receipt():
     parts = db.query_all("SELECT * FROM parts ORDER BY part_name")
     if request.method == "POST":
         f = request.form
-        part_id = f["part_id"]
-        qty = float(f.get("quantity") or 1)
-        serials_raw = f.get("serial_numbers", "").strip()
-        serials = [s.strip() for s in serials_raw.splitlines() if s.strip()]
-        date_mfg = f.get("date_mfg", "")
-        batch_number = f.get("batch_number", "").strip()
-        # Таможенная пошлина здесь НЕ вводится — она атрибут позиции
-        # (parts.customs_duty_percent, редактируется в карточке детали) и
-        # одна и та же для всех партий этой детали, см. _sync_part_costing().
-        exchange_rate = float(f["exchange_rate"]) if f.get("exchange_rate") else None
-        total_cost_cny = float(f["total_cost_cny"]) if f.get("total_cost_cny") else None
-        transfer_price_rub = float(f["transfer_price_rub"]) if f.get("transfer_price_rub") else None
 
-        if serials:
-            # Одна ПАРТИЯ поступления = одна строка receipts, даже если в ней
-            # сразу несколько серийных номеров — раньше на каждый серийный
-            # номер создавалась отдельная строка с задублированными данными
-            # партии (курс/стоимость), теперь остаток и стоимость считаются
-            # по партии в целом (см. app/stock.py).
-            qty_batch = len(serials)
-            receipt_id = db.execute_returning_id(
-                """INSERT INTO receipts (part_id, quantity, remaining_quantity, receipt_date, order_ref,
-                                          batch_serial_number, date_mfg,
-                                          exchange_rate, total_cost_cny, transfer_price_rub, note, created_by)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                [part_id, qty_batch, qty_batch, f["receipt_date"], f.get("order_ref", ""),
-                 batch_number, date_mfg, exchange_rate, total_cost_cny,
-                 transfer_price_rub, f.get("note", ""), g.user["id"]],
-            )
-            created = 0
-            for serial in serials:
-                db.execute(
-                    """INSERT INTO units (part_id, serial_number, date_mfg, status, receipt_id)
-                       VALUES (%s,%s,%s,'in_stock',%s)""",
-                    [part_id, serial, date_mfg, receipt_id],
-                )
-                created += 1
-            cost_cny_per_unit = (total_cost_cny / qty_batch) if (total_cost_cny is not None and qty_batch) else total_cost_cny
-            _sync_part_costing(part_id, cost_cny_per_unit, exchange_rate, transfer_price_rub)
-            flash(f"Оприходовано серийных единиц: {created} (партия {batch_number or '№ не указан'}).", "ok")
-        else:
-            db.execute(
-                """INSERT INTO receipts (part_id, quantity, remaining_quantity, receipt_date, order_ref,
-                                          batch_serial_number, date_mfg, exchange_rate,
-                                          total_cost_cny, transfer_price_rub, note, created_by)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                [part_id, qty, qty, f["receipt_date"], f.get("order_ref", ""), batch_number,
-                 date_mfg, exchange_rate, total_cost_cny,
-                 transfer_price_rub, f.get("note", ""), g.user["id"]],
-            )
+        # --- поля заказа (общие для ВСЕХ позиций этого поступления) ---
+        receipt_date = f["receipt_date"]
+        order_ref = f.get("order_ref", "").strip()
+        order_total_weight_kg = _f(f.get("order_total_weight_kg"))
+        order_total_shipping_cost_rub = _f(f.get("order_total_shipping_cost_rub"))
+        exchange_rate = _f(f.get("exchange_rate"))
+
+        # --- позиции: параллельные списки, одна строка формы = один индекс ---
+        part_ids = f.getlist("position_part_id")
+        quantities = f.getlist("position_quantity")
+        total_costs_cny = f.getlist("position_total_cost_cny")
+        weights_kg = f.getlist("position_weight_kg")
+        dates_mfg = f.getlist("position_date_mfg")
+        serials_lists = f.getlist("position_serial_numbers")
+
+        def _at(lst, i, default=""):
+            return lst[i] if i < len(lst) else default
+
+        positions_created = 0
+        units_created = 0
+        for i, part_id in enumerate(part_ids):
+            part_id = (part_id or "").strip()
+            if not part_id:
+                continue
+
+            total_cost_cny = _f(_at(total_costs_cny, i))
+            weight_kg = _f(_at(weights_kg, i))
+            date_mfg = _at(dates_mfg, i, "").strip()
+            serials_raw = _at(serials_lists, i, "")
+            serials = [s.strip() for s in serials_raw.splitlines() if s.strip()]
+
+            if serials:
+                # Серийная деталь: количество = число указанных серийных
+                # номеров, значение поля "Количество" в этом случае игнорируется.
+                qty = float(len(serials))
+            else:
+                qty = _f(_at(quantities, i)) or 1.0
+
+            # Трансфер прайс за единицу этой позиции — доля от общих затрат
+            # на доставку заказа, пропорциональная доле веса позиции в общем
+            # весе заказа, делённая на количество единиц позиции (стоимость
+            # за единицу считается по формуле в app/costing.py).
+            transfer_price_rub = None
+            if weight_kg is not None and order_total_weight_kg and order_total_shipping_cost_rub is not None and qty:
+                position_transfer_total = order_total_shipping_cost_rub * (weight_kg / order_total_weight_kg)
+                transfer_price_rub = position_transfer_total / qty
+
             cost_cny_per_unit = (total_cost_cny / qty) if (total_cost_cny is not None and qty) else total_cost_cny
+
+            if serials:
+                # Одна ПОЗИЦИЯ = одна строка receipts, даже если в ней сразу
+                # несколько серийных номеров — остаток и стоимость считаются
+                # по позиции в целом (см. app/stock.py).
+                receipt_id = db.execute_returning_id(
+                    """INSERT INTO receipts (part_id, quantity, remaining_quantity, receipt_date, order_ref,
+                                              date_mfg, exchange_rate, total_cost_cny,
+                                              weight_kg, order_total_weight_kg, order_total_shipping_cost_rub,
+                                              transfer_price_rub, note, created_by)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                    [part_id, qty, qty, receipt_date, order_ref,
+                     date_mfg, exchange_rate, total_cost_cny,
+                     weight_kg, order_total_weight_kg, order_total_shipping_cost_rub,
+                     transfer_price_rub, f.get("note", ""), g.user["id"]],
+                )
+                for serial in serials:
+                    db.execute(
+                        """INSERT INTO units (part_id, serial_number, date_mfg, status, receipt_id)
+                           VALUES (%s,%s,%s,'in_stock',%s)""",
+                        [part_id, serial, date_mfg, receipt_id],
+                    )
+                    units_created += 1
+            else:
+                db.execute(
+                    """INSERT INTO receipts (part_id, quantity, remaining_quantity, receipt_date, order_ref,
+                                              date_mfg, exchange_rate, total_cost_cny,
+                                              weight_kg, order_total_weight_kg, order_total_shipping_cost_rub,
+                                              transfer_price_rub, note, created_by)
+                       VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                    [part_id, qty, qty, receipt_date, order_ref,
+                     date_mfg, exchange_rate, total_cost_cny,
+                     weight_kg, order_total_weight_kg, order_total_shipping_cost_rub,
+                     transfer_price_rub, f.get("note", ""), g.user["id"]],
+                )
+
             _sync_part_costing(part_id, cost_cny_per_unit, exchange_rate, transfer_price_rub)
-            flash("Поступление зарегистрировано.", "ok")
+            positions_created += 1
+
+        if positions_created == 0:
+            flash("Не указано ни одной позиции — поступление не сохранено.", "error")
+            return render_template("receipts/new.html", parts=parts)
+
+        msg = f"Поступление зарегистрировано: позиций {positions_created}"
+        if units_created:
+            msg += f", серийных единиц оприходовано {units_created}"
+        msg += "."
+        flash(msg, "ok")
         return redirect(url_for("receipts.list_receipts"))
     return render_template("receipts/new.html", parts=parts)

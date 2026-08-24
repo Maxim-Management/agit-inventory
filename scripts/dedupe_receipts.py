@@ -5,7 +5,7 @@
 запуск импорта и т.п.).
 
 Дубликатом считаются строки receipts с ПОЛНОСТЬЮ совпадающими:
-  part_id, unit_id, quantity, receipt_date, order_ref, batch_serial_number,
+  part_id, unit_id, quantity, receipt_date, order_ref,
   date_mfg, exchange_rate, total_cost_cny, transfer_price_rub, note
 (id и created_at из сравнения намеренно исключены — это единственное, чем
 дубликаты отличаются друг от друга).
@@ -54,7 +54,7 @@ from app import db  # noqa: E402
 
 DEDUPE_FIELDS = [
     "part_id", "unit_id", "quantity", "receipt_date", "order_ref",
-    "batch_serial_number", "date_mfg", "exchange_rate",
+    "date_mfg", "exchange_rate",
     "total_cost_cny", "transfer_price_rub", "note",
 ]
 
@@ -101,7 +101,7 @@ def main():
         remove = g_sorted[1:]
         total_to_delete += len(remove)
         print(
-            f"  Деталь part_id={keep['part_id']}, партия «{keep.get('batch_serial_number') or '—'}», "
+            f"  Деталь part_id={keep['part_id']}, заказ «{keep.get('order_ref') or '—'}», "
             f"кол-во {keep['quantity']}, дата {keep['receipt_date']}: "
             f"сохраняем id={keep['id']}, удаляем id={[r['id'] for r in remove]}"
         )

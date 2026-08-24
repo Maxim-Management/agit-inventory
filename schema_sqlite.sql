@@ -91,18 +91,37 @@ CREATE TABLE IF NOT EXISTS receipts (
     quantity              NUMERIC NOT NULL DEFAULT 1,
     receipt_date          DATE NOT NULL,
     order_ref             TEXT NOT NULL DEFAULT '',
-    batch_serial_number   TEXT NOT NULL DEFAULT '',
     date_mfg              TEXT NOT NULL DEFAULT '',
     -- Таможенной пошлины здесь намеренно НЕТ — она привязана к позиции
     -- (parts.customs_duty_percent), а не к партии, см. комментарий у этого
-    -- поля в таблице parts выше.
+    -- поля в таблице parts выше. Партия/поступление теперь идентифицируется
+    -- парой order_ref + date_mfg (номер заказа + дата производства), а не
+    -- отдельным номером партии — прежнее поле batch_serial_number удалено
+    -- (миграция 0012), т.к. дублировало серийный номер единицы.
     exchange_rate         NUMERIC,
     total_cost_cny        NUMERIC,
+    -- Вес этой позиции (строки поступления), кг — вводится вручную (общий
+    -- вес по факту, с коробки/накладной), а не берётся из карточки детали.
+    -- Вместе с order_total_weight_kg/order_total_shipping_cost_rub этого же
+    -- заказа используется для автоматического расчёта трансфер прайса
+    -- (см. app/routes_receipts.py: транспорт прайс позиции = общие затраты
+    -- на доставку заказа × (вес позиции / общий вес заказа), далее — за
+    -- единицу этой позиции). order_total_weight_kg и
+    -- order_total_shipping_cost_rub дублируются в каждую позицию одного
+    -- заказа (справочно/для аудита расчёта, отдельной таблицы заказов нет).
+    weight_kg                     NUMERIC,
+    order_total_weight_kg         NUMERIC,
+    order_total_shipping_cost_rub NUMERIC,
     -- Трансфер прайс за единицу в этой партии, ₽ (логистика/доставка сверх
     -- таможенной стоимости) — вместе с total_cost_cny/quantity, exchange_rate
     -- партии и customs_duty_percent детали участвует в формуле стоимости
     -- единицы (см. app/costing.py). При сохранении поступления актуализирует
-    -- соответствующие поля в карточке детали (parts).
+    -- соответствующие поля в карточке детали (parts). Рассчитывается
+    -- автоматически из weight_kg/order_total_weight_kg/
+    -- order_total_shipping_cost_rub (см. выше), но хранится явно, т.к. это
+    -- ЕДИНСТВЕННОЕ значение, которое реально участвует в формуле стоимости
+    -- единицы (app/costing.py) — вес и итоговые суммы заказа в ней не
+    -- используются напрямую.
     transfer_price_rub    NUMERIC,
     remaining_quantity    NUMERIC NOT NULL DEFAULT 0,
     note                  TEXT NOT NULL DEFAULT '',

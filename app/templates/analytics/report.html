@@ -22,7 +22,7 @@
 </form>
 <p class="text-xs text-slate-400 mb-6">Остаток комплектующих на складе и средняя наработка — всегда на текущий момент (снимок). Выручка и затраты — за выбранный период (без дат — за всё время).</p>
 
-<div class="grid md:grid-cols-3 gap-4 mb-6">
+<div class="grid md:grid-cols-2 gap-4 mb-6">
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Остаток комплектующих на складе, ₽</div>
     <div class="text-2xl font-semibold text-blue-700 mt-1">{{ data.stock_value_rub|num }}</div>
@@ -31,11 +31,6 @@
     <div class="text-xs text-slate-500">Средняя наработка на инструмент, ч</div>
     <div class="text-2xl font-semibold mt-1">{{ data.avg_tool_hours|num }}</div>
     <div class="text-xs text-slate-400 mt-0.5">по {{ data.tools_count }} инструмент(ам)</div>
-  </div>
-  <div class="bg-white border border-slate-200 rounded-xl p-4">
-    <div class="text-xs text-slate-500">Средняя наработка на компонент, ч</div>
-    <div class="text-2xl font-semibold mt-1">{{ data.avg_component_hours|num }}</div>
-    <div class="text-xs text-slate-400 mt-0.5">по {{ data.components_count }} компонент(ам)</div>
   </div>
 </div>
 

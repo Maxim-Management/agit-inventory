@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from . import db
 from .auth import login_required, roles_required
 from .analytics import REASON_LABELS
-from .stock import consume_from_batch, open_batches_for_part
+from .stock import consume_from_batch, open_batches_for_part, batch_label
 
 bp = Blueprint("writeoffs", __name__, url_prefix="/write-offs")
 
@@ -100,7 +100,7 @@ def new_bulk_writeoff():
     return render_template(
         "writeoffs/bulk.html", parts=parts, reason_labels=REASON_LABELS, preselect_part_id=preselect_part_id,
         batches_by_part_json=json.dumps({str(pid): [
-            {"id": b["id"], "label": f"{b.get('batch_serial_number') or ('партия #' + str(b['id']))} · "
+            {"id": b["id"], "label": f"{batch_label(b)} · "
                                       f"{b.get('receipt_date') or ''} · остаток {float(b['remaining_quantity']):g}"}
             for b in batches
         ] for pid, batches in batches_by_part.items()}),

@@ -11,15 +11,19 @@
                                 рублях (unit_transfer_price_rub, среднее по
                                 строкам детали). Для каждой партии/строки
                                 дополнительно сохраняются справочные поля:
-                                серийный номер партии (или "-"), дата
-                                производства, таможенная пошлина (%), курс
-                                валюты на момент покупки, общая стоимость
-                                партии в CNY (receipts.batch_serial_number /
-                                date_mfg / customs_duty_percent /
-                                exchange_rate / total_cost_cny). Если серийный
-                                номер партии совпадает с реальной серийной
-                                единицей из "AGIT components" — поступление
-                                дополнительно связывается с ней (receipts.unit_id).
+                                дата производства, таможенная пошлина (%),
+                                курс валюты на момент покупки, общая
+                                стоимость партии в CNY (receipts.date_mfg /
+                                customs_duty_percent / exchange_rate /
+                                total_cost_cny). Серийный номер по строке
+                                партии из исходника (колонка r[3] листа
+                                "AGIT Spares") в receipts НЕ сохраняется
+                                (поле receipts.batch_serial_number удалено,
+                                см. миграцию 0012) — используется только
+                                транзитно, в памяти скрипта, чтобы если он
+                                совпадает с реальной серийной единицей из
+                                "AGIT components", связать с ней поступление
+                                (receipts.unit_id).
   - лист "AGIT components"  -> серийные единицы (units), включая OD/ID для
                                 ротора/статора (парсится из колонки Remarks),
                                 статус (на складе / установлен на сборку); из
@@ -125,7 +129,11 @@ def parse_od_id(remarks):
 
 
 def import_parts(ws):
-    """Лист 'AGIT Spares' -> справочник деталей + история поступлений."""
+    """Лист 'AGIT Spares' -> справочник деталей + история поступлений.
+    Возвращает (part_id_by_number, receipt_link_candidates) — второй элемент
+    список (receipt_id, part_id, serial_for_linking) для последующей
+    backfill_receipt_unit_links() (серийный номер строки партии из Excel в
+    БД не хранится, см. комментарий в шапке файла)."""
     rows = list(ws.iter_rows(min_row=3, values_only=True))
 
     # Первый проход: агрегируем по part_number (в исходнике одна деталь может
@@ -172,6 +180,7 @@ def import_parts(ws):
 
     created, updated = 0, 0
     part_id_by_number = {}
+    receipt_link_candidates = []
 
     for part_number, a in agg.items():
         category = guess_category(a["part_name"])
@@ -200,7 +209,7 @@ def import_parts(ws):
 
         for r in a["rows"]:
             serial_raw = r[3] if len(r) > 3 else None
-            batch_serial_number = str(serial_raw).strip() if serial_raw is not None else "-"
+            serial_for_linking = str(serial_raw).strip() if serial_raw is not None else "-"
             row_date_mfg = str(r[5]).strip() if len(r) > 5 and r[5] else ""
             # Таможенная пошлина здесь НЕ пишется на receipts — она атрибут
             # позиции (parts.customs_duty_percent, усреднена по всем строкам
@@ -218,18 +227,19 @@ def import_parts(ws):
                     # с чистой БД ничего из этой партии ещё не списано; для
                     # серийных единиц backfill_receipt_unit_links() ниже
                     # уточнит его по фактическому статусу конкретной единицы.
-                    db.execute(
+                    receipt_id = db.execute_returning_id(
                         """INSERT INTO receipts (part_id, quantity, remaining_quantity, receipt_date, order_ref,
-                                                  batch_serial_number, date_mfg,
-                                                  exchange_rate, total_cost_cny, transfer_price_rub, note)
-                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                                                  date_mfg, exchange_rate, total_cost_cny, transfer_price_rub, note)
+                           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
                         [part_id, qty, qty, receipt_date.isoformat(), order_ref,
-                         batch_serial_number, row_date_mfg,
-                         row_exchange_rate, row_total_cost_cny, row_transfer_price, "Импортировано из Excel"],
+                         row_date_mfg, row_exchange_rate, row_total_cost_cny, row_transfer_price,
+                         "Импортировано из Excel"],
                     )
+                    if serial_for_linking and serial_for_linking != "-":
+                        receipt_link_candidates.append((receipt_id, part_id, serial_for_linking))
 
     print(f"Справочник деталей: создано {created}, уже существовало {updated}.")
-    return part_id_by_number
+    return part_id_by_number, receipt_link_candidates
 
 
 def get_or_create_tool(serial_number, tool_size):
@@ -319,34 +329,30 @@ def import_units(ws, part_id_by_number):
           f"(уникальных серийных номеров 'Installed on tool' в этом листе).")
 
 
-def backfill_receipt_unit_links():
+def backfill_receipt_unit_links(receipt_link_candidates):
     """Проставляет receipts.unit_id (и, в обратную сторону, units.receipt_id —
     основную связь для партионного учёта, см. миграцию 0008) там, где серийный
-    номер строки поступления (batch_serial_number, из листа 'AGIT Spares')
+    номер строки поступления (из листа 'AGIT Spares', собран в памяти в
+    import_parts() — сама БД это поле больше не хранит, см. миграцию 0012)
     совпадает с реальной серийной единицей той же детали, заведённой из листа
     'AGIT components'. Заодно уточняет остаток партии (remaining_quantity):
     для партии из одной привязанной единицы остаток = 1, если единица ещё
     'in_stock', иначе 0 (уже установлена/списана — в партии ничего не осталось)."""
-    rows = db.query_all(
-        """SELECT r.id AS receipt_id, r.part_id, r.batch_serial_number
-           FROM receipts r
-           WHERE r.unit_id IS NULL AND r.batch_serial_number <> '' AND r.batch_serial_number <> '-'"""
-    )
     linked = 0
-    for r in rows:
+    for receipt_id, part_id, serial in receipt_link_candidates:
         unit = db.query_one(
             "SELECT id, status FROM units WHERE part_id = %s AND serial_number = %s",
-            [r["part_id"], r["batch_serial_number"]],
+            [part_id, serial],
         )
         if unit:
             remaining = 1 if unit["status"] == "in_stock" else 0
             db.execute(
                 "UPDATE receipts SET unit_id = %s, remaining_quantity = %s WHERE id = %s",
-                [unit["id"], remaining, r["receipt_id"]],
+                [unit["id"], remaining, receipt_id],
             )
-            db.execute("UPDATE units SET receipt_id = %s WHERE id = %s", [r["receipt_id"], unit["id"]])
+            db.execute("UPDATE units SET receipt_id = %s WHERE id = %s", [receipt_id, unit["id"]])
             linked += 1
-    print(f"Поступления связаны с серийными единицами: {linked} из {len(rows)} с указанным серийным номером.")
+    print(f"Поступления связаны с серийными единицами: {linked} из {len(receipt_link_candidates)} с указанным серийным номером.")
 
 
 def finalize_is_serialized():
@@ -376,9 +382,9 @@ def main():
     # устойчивее к обрыву соединения пулером Supabase при частом открытии
     # новых подключений подряд (см. db.bulk_session).
     with db.bulk_session():
-        part_id_by_number = import_parts(wb["AGIT Spares"])
+        part_id_by_number, receipt_link_candidates = import_parts(wb["AGIT Spares"])
         import_units(wb["AGIT components"], part_id_by_number)
-        backfill_receipt_unit_links()
+        backfill_receipt_unit_links(receipt_link_candidates)
         finalize_is_serialized()
 
     print("Импорт завершён.")
