@@ -27,8 +27,7 @@
     <tr>
       <th class="px-4 py-2">Заказчик</th>
       <th class="px-4 py-2">Номер договора</th>
-      <th class="px-4 py-2 text-right">Ставка за час, ₽</th>
-      <th class="px-4 py-2 text-right">Ставка за сутки ожидания, ₽</th>
+      <th class="px-4 py-2">Ставки по типоразмеру (работа / дежурство, ₽)</th>
       <th class="px-4 py-2 text-right">Выручка по нему, ₽</th>
       <th class="px-4 py-2"></th>
     </tr>
@@ -36,19 +35,22 @@
   <tbody>
     {% for c in customers %}
     <tr class="border-t border-slate-100 hover:bg-slate-50">
-      <td class="px-4 py-2 font-medium">{{ c.name }}</td>
-      <td class="px-4 py-2 text-slate-500">{{ c.contract_number or '—' }}</td>
-      <td class="px-4 py-2 text-right">{{ c.work_rate_rub_per_hour|num }}</td>
-      <td class="px-4 py-2 text-right">{{ c.standby_rate_rub_per_day|num }}</td>
-      <td class="px-4 py-2 text-right">{{ c.revenue_total|num }}</td>
-      <td class="px-4 py-2 text-right">
+      <td class="px-4 py-2 font-medium align-top">{{ c.name }}</td>
+      <td class="px-4 py-2 text-slate-500 align-top">{{ c.contract_number or '—' }}</td>
+      <td class="px-4 py-2 text-slate-500 align-top">
+        {% for r in c.rates_summary %}
+        <div class="whitespace-nowrap">{{ r.size }}": {{ r.work_rate|num }} ₽/{{ work_rate_unit_labels[r.unit] }} · деж. {{ r.standby_rate_rub_per_day|num }} ₽/сут</div>
+        {% endfor %}
+      </td>
+      <td class="px-4 py-2 text-right align-top">{{ c.revenue_total|num }}</td>
+      <td class="px-4 py-2 text-right align-top">
         {% if can_edit %}
         <a href="{{ url_for('customers.edit_customer', customer_id=c.id) }}" class="text-blue-700 hover:underline text-xs">Редактировать</a>
         {% endif %}
       </td>
     </tr>
     {% else %}
-    <tr><td colspan="6" class="px-4 py-6 text-center text-slate-400">Заказчики пока не добавлены.</td></tr>
+    <tr><td colspan="5" class="px-4 py-6 text-center text-slate-400">Заказчики пока не добавлены.</td></tr>
     {% endfor %}
   </tbody>
 </table>

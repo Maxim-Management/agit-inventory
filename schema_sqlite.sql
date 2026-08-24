@@ -182,13 +182,22 @@ CREATE TABLE IF NOT EXISTS customers (
     id                     INTEGER PRIMARY KEY AUTOINCREMENT,
     name                   TEXT NOT NULL,
     contract_number        TEXT NOT NULL DEFAULT '',
-    work_rate_rub_per_hour NUMERIC NOT NULL DEFAULT 0,
-    standby_rate_rub_per_day NUMERIC NOT NULL DEFAULT 0,
     note                   TEXT NOT NULL DEFAULT '',
     created_by             INTEGER REFERENCES users(id),
     created_at             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
+
+CREATE TABLE IF NOT EXISTS customer_rates (
+    id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_id               INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    tool_size                 TEXT NOT NULL,
+    work_rate                 NUMERIC NOT NULL DEFAULT 0,
+    work_rate_unit            TEXT NOT NULL DEFAULT 'hour' CHECK (work_rate_unit IN ('hour', 'day')),
+    standby_rate_rub_per_day  NUMERIC NOT NULL DEFAULT 0,
+    UNIQUE (customer_id, tool_size)
+);
+CREATE INDEX IF NOT EXISTS idx_customerrates_customer ON customer_rates(customer_id);
 
 CREATE TABLE IF NOT EXISTS tool_revenue (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -199,10 +208,12 @@ CREATE TABLE IF NOT EXISTS tool_revenue (
     note         TEXT NOT NULL DEFAULT '',
     customer_id  INTEGER REFERENCES customers(id) ON DELETE SET NULL,
     well_number  TEXT NOT NULL DEFAULT '',
-    work_hours   NUMERIC,
+    work_qty     NUMERIC,
+    work_unit    TEXT NOT NULL DEFAULT 'hour' CHECK (work_unit IN ('hour', 'day')),
     standby_days NUMERIC,
-    work_rate_rub_per_hour   NUMERIC,
+    work_rate                NUMERIC,
     standby_rate_rub_per_day NUMERIC,
+    usage_hours  NUMERIC,
     usage_log_id INTEGER REFERENCES tool_usage_logs(id) ON DELETE SET NULL,
     created_by   INTEGER REFERENCES users(id),
     created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP

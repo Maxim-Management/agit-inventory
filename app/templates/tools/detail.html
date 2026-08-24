@@ -152,7 +152,8 @@
       <thead class="text-slate-500 text-left">
         <tr>
           <th class="py-1">Дата</th><th class="py-1">Заказчик</th><th class="py-1">Скв. №</th>
-          <th class="py-1 text-right">Работа, ч</th><th class="py-1 text-right">Дежурство, сут</th>
+          <th class="py-1 text-right">Работа</th><th class="py-1 text-right">Дежурство, сут</th>
+          <th class="py-1 text-right">Часы в наработку</th>
           <th class="py-1 text-right">Сумма, ₽</th><th class="py-1">Примечание</th>{% if is_admin %}<th class="py-1"></th>{% endif %}
         </tr>
       </thead>
@@ -163,6 +164,7 @@
           <td class="py-1"><input type="date" name="revenue_date" form="revenue-edit-{{ r.id }}" value="{{ r.revenue_date }}" class="w-32 border border-slate-200 rounded px-1 py-0.5 text-xs"></td>
           <td class="py-1 text-slate-400">—</td>
           <td class="py-1 text-slate-400">—</td>
+          <td class="py-1 text-right text-slate-400">—</td>
           <td class="py-1 text-right text-slate-400">—</td>
           <td class="py-1 text-right text-slate-400">—</td>
           <td class="py-1 text-right"><input type="number" step="0.01" name="amount" form="revenue-edit-{{ r.id }}" value="{{ r.amount }}" class="w-20 border border-slate-200 rounded px-1 py-0.5 text-xs text-right"></td>
@@ -177,8 +179,9 @@
           <td class="py-1">{{ r.revenue_date }}</td>
           <td class="py-1 text-slate-500">{{ r.customer_name or '—' }}</td>
           <td class="py-1 text-slate-500">{{ r.well_number or '—' }}</td>
-          <td class="py-1 text-right">{{ r.work_hours|num if r.work_hours is not none else '—' }}</td>
-          <td class="py-1 text-right">{{ r.standby_days|num if r.standby_days is not none else '—' }}</td>
+          <td class="py-1 text-right">{{ r.work_qty|num(2) if r.work_qty is not none else '—' }}{% if r.work_qty is not none %} {{ 'ч' if r.work_unit == 'hour' else 'сут' }}{% endif %}</td>
+          <td class="py-1 text-right">{{ r.standby_days|num(2) if r.standby_days is not none else '—' }}</td>
+          <td class="py-1 text-right">{{ r.usage_hours|num(2) if r.usage_hours is not none else '—' }}</td>
           <td class="py-1 text-right">{{ r.amount|num }}</td>
           <td class="py-1 text-slate-500">{{ r.note }}</td>
           {% if is_admin %}
@@ -215,7 +218,7 @@
         <select name="customer_id" id="revenue-customer-select" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
           <option value="">Без заказчика (вручную)</option>
           {% for c in customers %}
-          <option value="{{ c.id }}">{{ c.name }}{% if c.contract_number %} ({{ c.contract_number }}){% endif %}</option>
+          <option value="{{ c.id }}">{{ c.name }}{% if c.contract_number %} ({{ c.contract_number }}){% endif %}{% if not c.rate_ok %} — ставки не заданы для {{ tool.tool_size }}{% endif %}</option>
           {% endfor %}
         </select>
       </div>
@@ -224,9 +227,14 @@
       </div>
       <div id="revenue-customer-fields" class="col-span-2 grid grid-cols-3 gap-3 hidden">
         <div><label class="block text-xs text-slate-500 mb-1">№ скважины</label><input name="well_number" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
-        <div><label class="block text-xs text-slate-500 mb-1">Работа, ч</label><input type="number" step="0.1" name="work_hours" id="revenue-hours-input" value="0" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
-        <div><label class="block text-xs text-slate-500 mb-1">Дежурство, сут</label><input type="number" step="0.1" name="standby_days" id="revenue-standby-input" value="0" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
-        <p class="col-span-3 text-xs text-slate-400" id="revenue-computed-preview">Сумма будет рассчитана автоматически по ставкам заказчика; часы работы перенесутся в наработку инструмента.</p>
+        <div><label class="block text-xs text-slate-500 mb-1" id="revenue-work-label">Работа</label><input type="number" step="0.01" name="work_qty" id="revenue-work-input" value="0" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
+        <div><label class="block text-xs text-slate-500 mb-1">Дежурство, сут</label><input type="number" step="0.01" name="standby_days" id="revenue-standby-input" value="0" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
+        <div class="col-span-3 hidden" id="revenue-usage-hours-wrap">
+          <label class="block text-xs text-slate-500 mb-1">Часы для наработки инструмента *</label>
+          <input type="number" step="0.01" name="usage_hours" id="revenue-usage-hours-input" value="0" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm max-w-[200px]">
+          <p class="text-xs text-slate-400 mt-1">Ставка «Работа» у этого заказчика — за сутки, поэтому сколько часов фактически отработал инструмент нужно указать отдельно (сутки работы сами по себе не определяют часы).</p>
+        </div>
+        <p class="col-span-3 text-xs text-slate-400" id="revenue-computed-preview">Сумма будет рассчитана автоматически по ставкам заказчика для этого типоразмера.</p>
       </div>
       <div class="col-span-2"><label class="block text-xs text-slate-500 mb-1">Примечание</label><input name="note" class="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-sm"></div>
       <div class="col-span-2"><button class="bg-slate-900 text-white rounded-lg px-4 py-2 text-sm hover:bg-slate-800">Добавить выручку</button></div>
@@ -238,18 +246,31 @@
         var manualFields = document.getElementById('revenue-manual-fields');
         var customerFields = document.getElementById('revenue-customer-fields');
         var amountInput = document.getElementById('revenue-amount-input');
-        var hoursInput = document.getElementById('revenue-hours-input');
+        var workLabel = document.getElementById('revenue-work-label');
+        var workInput = document.getElementById('revenue-work-input');
         var standbyInput = document.getElementById('revenue-standby-input');
+        var usageHoursWrap = document.getElementById('revenue-usage-hours-wrap');
+        var usageHoursInput = document.getElementById('revenue-usage-hours-input');
         var preview = document.getElementById('revenue-computed-preview');
+        var unitLabels = {hour: 'ч', day: 'сут'};
 
         function updatePreview() {
           var rate = rates[select.value];
-          if (!rate) return;
-          var hours = parseFloat(hoursInput.value) || 0;
+          if (!rate) {
+            preview.textContent = 'У этого заказчика не заданы ставки для типоразмера этого инструмента — задайте их в карточке заказчика перед внесением выручки.';
+            return;
+          }
+          workLabel.textContent = 'Работа, ' + unitLabels[rate.work_unit];
+          var isDay = rate.work_unit === 'day';
+          usageHoursWrap.classList.toggle('hidden', !isDay);
+          usageHoursInput.required = isDay;
+          if (!isDay) { usageHoursInput.value = workInput.value; }
+
+          var qty = parseFloat(workInput.value) || 0;
           var standby = parseFloat(standbyInput.value) || 0;
-          var amount = hours * rate.work_rate + standby * rate.standby_rate;
+          var amount = qty * rate.work_rate + standby * rate.standby_rate;
           preview.textContent = 'Расчётная сумма: ' + amount.toFixed(2) + ' ₽ (ставки: ' +
-            rate.work_rate + ' ₽/ч, ' + rate.standby_rate + ' ₽/сутки).';
+            rate.work_rate + ' ₽/' + unitLabels[rate.work_unit] + ', ' + rate.standby_rate + ' ₽/сутки дежурства).';
         }
 
         function toggleMode() {
@@ -261,12 +282,14 @@
           } else {
             manualFields.classList.remove('hidden');
             customerFields.classList.add('hidden');
+            usageHoursWrap.classList.add('hidden');
+            usageHoursInput.required = false;
             amountInput.required = true;
           }
         }
 
         select.addEventListener('change', toggleMode);
-        hoursInput.addEventListener('input', updatePreview);
+        workInput.addEventListener('input', updatePreview);
         standbyInput.addEventListener('input', updatePreview);
         toggleMode();
       })();

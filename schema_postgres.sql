@@ -240,26 +240,44 @@ CREATE TABLE IF NOT EXISTS customers (
     id                     SERIAL PRIMARY KEY,
     name                   TEXT NOT NULL,
     contract_number        TEXT NOT NULL DEFAULT '',
-    work_rate_rub_per_hour NUMERIC NOT NULL DEFAULT 0,
-    standby_rate_rub_per_day NUMERIC NOT NULL DEFAULT 0,
     note                   TEXT NOT NULL DEFAULT '',
     created_by             INTEGER REFERENCES users(id),
     created_at             TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
 
+-- Ставки заказчика — отдельно по КАЖДОМУ типоразмеру инструмента (4 3/4",
+-- 6 3/4", 8" — см. _TOOL_NAME_RULES в app/tools.py), т.к. стоимость работы и
+-- дежурства у одного заказчика может отличаться в зависимости от размера
+-- инструмента. У ставки "Работа" есть выбор единицы измерения — час или
+-- сутки (work_rate_unit); ставка "Дежурство" всегда за сутки.
+CREATE TABLE IF NOT EXISTS customer_rates (
+    id                        SERIAL PRIMARY KEY,
+    customer_id               INTEGER NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+    tool_size                 TEXT NOT NULL,
+    work_rate                 NUMERIC NOT NULL DEFAULT 0,
+    work_rate_unit            TEXT NOT NULL DEFAULT 'hour' CHECK (work_rate_unit IN ('hour', 'day')),
+    standby_rate_rub_per_day  NUMERIC NOT NULL DEFAULT 0,
+    UNIQUE (customer_id, tool_size)
+);
+CREATE INDEX IF NOT EXISTS idx_customerrates_customer ON customer_rates(customer_id);
+
 -- Выручка, заработанная конкретным инструментом (по серийному номеру) —
 -- используется для расчёта рентабельности (выручка минус (амортизация +
 -- стоимость ремонтных/сборочных работ) по этому же инструменту).
 -- Может вноситься вручную (amount заполнен напрямую, customer_id пуст —
--- прежний способ) либо через выбор заказчика: тогда well_number/work_hours/
--- standby_days вводятся на форме, ставки подтягиваются из карточки
--- заказчика и "замораживаются" в work_rate_rub_per_hour/
+-- прежний способ) либо через выбор заказчика: тогда well_number/work_qty/
+-- standby_days вводятся на форме, ставка для типоразмера ЭТОГО инструмента
+-- подтягивается из customer_rates и "замораживается" в work_rate/work_unit/
 -- standby_rate_rub_per_day на этой же записи, amount считается автоматически
--- (work_hours * ставка_часа + standby_days * ставка_суток), а часы работы
--- переносятся в наработку инструмента (создаётся запись tool_usage_logs,
--- её id сохраняется в usage_log_id — при удалении этой записи выручки
--- связанная наработка откатывается и удаляется, см. app/tools.py).
+-- (work_qty * work_rate + standby_days * ставка_суток). Часы, переносимые в
+-- наработку инструмента (usage_hours), — это ВСЕГДА часы: если work_unit =
+-- 'hour', usage_hours = work_qty автоматически; если work_unit = 'day'
+-- (ставка за сутки), work_qty суток само по себе не говорит, сколько часов
+-- отработал инструмент, поэтому usage_hours в этом случае вводится отдельным
+-- полем на форме. Перенесённая наработка создаёт запись tool_usage_logs, её
+-- id сохраняется в usage_log_id — при удалении этой записи выручки
+-- связанная наработка откатывается и удаляется, см. app/tools.py.
 CREATE TABLE IF NOT EXISTS tool_revenue (
     id           SERIAL PRIMARY KEY,
     tool_id      INTEGER NOT NULL REFERENCES tools(id) ON DELETE CASCADE,
@@ -269,10 +287,12 @@ CREATE TABLE IF NOT EXISTS tool_revenue (
     note         TEXT NOT NULL DEFAULT '',
     customer_id  INTEGER REFERENCES customers(id) ON DELETE SET NULL,
     well_number  TEXT NOT NULL DEFAULT '',
-    work_hours   NUMERIC,
+    work_qty     NUMERIC,
+    work_unit    TEXT NOT NULL DEFAULT 'hour' CHECK (work_unit IN ('hour', 'day')),
     standby_days NUMERIC,
-    work_rate_rub_per_hour   NUMERIC,
+    work_rate                NUMERIC,
     standby_rate_rub_per_day NUMERIC,
+    usage_hours  NUMERIC,
     usage_log_id INTEGER REFERENCES tool_usage_logs(id) ON DELETE SET NULL,
     created_by   INTEGER REFERENCES users(id),
     created_at   TIMESTAMP NOT NULL DEFAULT NOW()

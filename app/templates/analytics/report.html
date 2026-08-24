@@ -55,4 +55,19 @@
     <div class="text-xs text-slate-400 mt-0.5">выручка − затраты</div>
   </div>
 </div>
+
+<div class="bg-white border border-slate-200 rounded-xl p-5">
+  <h2 class="font-semibold mb-1">Выгрузка отчёта в CSV</h2>
+  <p class="text-xs text-slate-400 mb-3">Отметьте, что выгрузить — можно любое сочетание, всё соберётся в один файл. Даты «с»/«по» применяются к выручке и затратам (как заполнено выше); остатки и наработка выгружаются всегда на текущий момент.</p>
+  <form method="get" action="{{ url_for('analytics.export_report_csv') }}" class="flex flex-wrap items-center gap-x-6 gap-y-3">
+    <input type="hidden" name="date_from" value="{{ date_from or '' }}">
+    <input type="hidden" name="date_to" value="{{ date_to or '' }}">
+    <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="include_stock" value="1" checked class="rounded"> Остатки на складе (по деталям)</label>
+    <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="include_tool_hours" value="1" checked class="rounded"> Наработка по инструментам</label>
+    <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="include_component_hours" value="1" checked class="rounded"> Наработка по компонентам</label>
+    <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="include_revenue" value="1" checked class="rounded"> Выручка по инструментам</label>
+    <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="include_costs" value="1" checked class="rounded"> Затраты по работам</label>
+    <button class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm">Скачать CSV</button>
+  </form>
+</div>
 {% endblock %}

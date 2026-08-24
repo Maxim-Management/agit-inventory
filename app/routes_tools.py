@@ -76,12 +76,16 @@ def detail(tool_id):
         )
 
     customers = customers_mod.list_customers()
-    customers_json = json.dumps({
-        str(c["id"]): {
-            "work_rate": float(c["work_rate_rub_per_hour"] or 0),
-            "standby_rate": float(c["standby_rate_rub_per_day"] or 0),
-        } for c in customers
-    })
+    customers_json_map = {}
+    for c in customers:
+        rate = customers_mod.get_rate_for_tool(c["id"], tool["tool_size"])
+        c["rate_ok"] = bool(rate)
+        if rate:
+            customers_json_map[str(c["id"])] = {
+                "work_rate": rate["work_rate"], "work_unit": rate["work_rate_unit"],
+                "standby_rate": rate["standby_rate_rub_per_day"],
+            }
+    customers_json = json.dumps(customers_json_map)
 
     return render_template(
         "tools/detail.html", tool=tool, units=units, usage_history=usage_history,
@@ -160,23 +164,22 @@ def add_revenue(tool_id):
     f = request.form
     customer_id = f.get("customer_id") or None
     if customer_id:
-        work_hours = float(f.get("work_hours") or 0)
+        work_qty = float(f.get("work_qty") or 0)
         standby_days = float(f.get("standby_days") or 0)
-        if work_hours <= 0 and standby_days <= 0:
-            flash("Укажите количество работы (ч) и/или дежурства (сут.) больше нуля.", "error")
+        usage_hours = float(f.get("usage_hours") or 0)
+        if work_qty <= 0 and standby_days <= 0:
+            flash("Укажите количество работы и/или дежурства больше нуля.", "error")
             return redirect(url_for("tools.detail", tool_id=tool_id))
         try:
             amount = tools_mod.log_tool_revenue(
                 tool_id, f["revenue_date"], f.get("note", ""), g.user["id"],
                 customer_id=customer_id, well_number=f.get("well_number", ""),
-                work_hours=work_hours, standby_days=standby_days,
+                work_qty=work_qty, standby_days=standby_days, usage_hours=usage_hours,
             )
         except ValueError as e:
             flash(str(e), "error")
             return redirect(url_for("tools.detail", tool_id=tool_id))
         msg = f"Выручка {amount:g} ₽ добавлена."
-        if work_hours > 0:
-            msg += f" Наработка +{work_hours:g} ч перенесена в наработку инструмента."
         flash(msg, "ok")
     else:
         amount = float(f.get("amount") or 0)

@@ -272,47 +272,70 @@ def delete_tool_usage(tool_id, log_id):
 
 
 def log_tool_revenue(tool_id, revenue_date, note, created_by, amount=None, currency="RUB",
-                      customer_id=None, well_number="", work_hours=0, standby_days=0):
+                      customer_id=None, well_number="", work_qty=0, standby_days=0, usage_hours=None):
     """Вносит запись о выручке. Два режима:
       - customer_id не задан (прежний способ, вручную) — сумма (amount)
         вводится оператором напрямую.
-      - customer_id задан — сумма считается автоматически по ставкам
-        заказчика (work_hours * ставка часа + standby_days * ставка суток),
-        ставки "замораживаются" на записи (work_rate_rub_per_hour/
-        standby_rate_rub_per_day), а часы работы (work_hours), если больше
-        нуля, переносятся в наработку инструмента через log_tool_usage() —
-        id созданной записи наработки сохраняется в usage_log_id, чтобы при
-        удалении этой записи выручки можно было откатить и её.
+      - customer_id задан — ставка берётся из customer_rates ДЛЯ ТИПОРАЗМЕРА
+        ЭТОГО ИНСТРУМЕНТА (см. customers.get_rate_for_tool); сумма считается
+        автоматически (work_qty * ставка_работы + standby_days *
+        ставка_суток), ставки "замораживаются" на записи (work_rate/
+        work_unit/standby_rate_rub_per_day).
+        Наработка инструмента — ВСЕГДА в часах: если ставка "Работа" за час
+        (work_unit='hour'), в наработку переносится сам work_qty; если ставка
+        за сутки (work_unit='day'), work_qty суток ничего не говорит о числе
+        часов — фактические часы берутся из отдельного параметра usage_hours
+        (вводится оператором на форме). Наработка переносится через
+        log_tool_usage(), id созданной записи сохраняется в usage_log_id —
+        чтобы при удалении этой записи выручки можно было откатить и её.
     Возвращает фактически сохранённую сумму (amount)."""
     from . import customers as customers_mod
 
     work_rate = None
+    work_unit = "hour"
     standby_rate = None
     usage_log_id = None
-    work_hours = float(work_hours or 0)
-    standby_days = float(standby_days or 0)
+    work_qty = round(float(work_qty or 0), 2)
+    standby_days = round(float(standby_days or 0), 2)
 
     if customer_id:
+        tool = get_tool(tool_id)
+        if not tool:
+            raise ValueError("Инструмент не найден")
         customer = customers_mod.get_customer(customer_id)
         if not customer:
             raise ValueError("Заказчик не найден")
-        work_rate = float(customer["work_rate_rub_per_hour"] or 0)
-        standby_rate = float(customer["standby_rate_rub_per_day"] or 0)
-        amount = round(work_hours * work_rate + standby_days * standby_rate, 2)
-        if work_hours > 0:
+        rate = customers_mod.get_rate_for_tool(customer_id, tool["tool_size"])
+        if not rate:
+            raise ValueError(
+                f"Для заказчика «{customer['name']}» не заданы ставки для типоразмера "
+                f"«{tool['tool_size']}» — задайте их в карточке заказчика."
+            )
+        work_rate = rate["work_rate"]
+        work_unit = rate["work_rate_unit"]
+        standby_rate = rate["standby_rate_rub_per_day"]
+        amount = round(work_qty * work_rate + standby_days * standby_rate, 2)
+
+        if work_unit == "hour":
+            usage_hours = work_qty
+        else:
+            usage_hours = round(float(usage_hours or 0), 2)
+
+        if usage_hours and usage_hours > 0:
             usage_note = note or (f"Наработка по выручке, скв. {well_number}" if well_number else "Наработка по выручке")
-            usage_log_id = log_tool_usage(tool_id, revenue_date, work_hours, usage_note, created_by)["log_id"]
+            usage_log_id = log_tool_usage(tool_id, revenue_date, usage_hours, usage_note, created_by)["log_id"]
     else:
         amount = float(amount or 0)
+        usage_hours = None
 
     db.execute(
         """INSERT INTO tool_revenue (tool_id, revenue_date, amount, currency, note, created_by,
-                                       customer_id, well_number, work_hours, standby_days,
-                                       work_rate_rub_per_hour, standby_rate_rub_per_day, usage_log_id)
-           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                                       customer_id, well_number, work_qty, work_unit, standby_days,
+                                       work_rate, standby_rate_rub_per_day, usage_hours, usage_log_id)
+           VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
         [tool_id, revenue_date, amount, currency or "RUB", note or "", created_by,
-         customer_id or None, well_number or "", work_hours if customer_id else None,
-         standby_days if customer_id else None, work_rate, standby_rate, usage_log_id],
+         customer_id or None, well_number or "", work_qty if customer_id else None, work_unit,
+         standby_days if customer_id else None, work_rate, standby_rate, usage_hours, usage_log_id],
     )
     return amount
 

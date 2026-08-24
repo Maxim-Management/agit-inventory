@@ -193,6 +193,68 @@ def ops_report(date_from=None, date_to=None):
     }
 
 
+def stock_report_rows():
+    """Детальная строка по КАЖДОЙ детали справочника — для выгрузки
+    «Остатки на складе» в сводном отчёте (агрегат — total_stock_value() —
+    показывается на экране, а для выгрузки нужна расшифровка по деталям)."""
+    from .stock import stock_map, part_stock_value
+
+    stock = stock_map()
+    parts = db.query_all("SELECT id, tool_size, part_name, part_number FROM parts ORDER BY part_name")
+    rows = []
+    for p in parts:
+        sv = part_stock_value(p["id"])
+        rows.append({
+            "tool_size": p["tool_size"], "part_name": p["part_name"], "part_number": p["part_number"],
+            "current_stock": stock.get(p["id"], 0),
+            "stock_value_rub": sv["stock_value_rub"],
+            "avg_exchange_rate": sv["avg_exchange_rate"],
+        })
+    return rows
+
+
+def tool_hours_report_rows():
+    """Наработка по КАЖДОМУ инструменту — для выгрузки в сводном отчёте."""
+    rows = db.query_all(
+        """SELECT t.serial_number, t.tool_size, COALESCE(SUM(l.hours_added), 0) AS hours
+           FROM tools t LEFT JOIN tool_usage_logs l ON l.tool_id = t.id
+           GROUP BY t.id, t.serial_number, t.tool_size
+           ORDER BY t.serial_number"""
+    )
+    return [{"serial_number": r["serial_number"], "tool_size": r["tool_size"], "hours": float(r["hours"] or 0)}
+            for r in rows]
+
+
+def component_hours_report_rows():
+    """Наработка по КАЖДОМУ серийному компоненту — для выгрузки в сводном отчёте."""
+    rows = db.query_all(
+        """SELECT u.serial_number, p.part_name, p.part_number, u.circulation_hours
+           FROM units u JOIN parts p ON p.id = u.part_id
+           ORDER BY p.part_name, u.serial_number"""
+    )
+    return [{"serial_number": r["serial_number"], "part_name": r["part_name"], "part_number": r["part_number"],
+              "hours": float(r["circulation_hours"] or 0)} for r in rows]
+
+
+def revenue_report_rows(date_from=None, date_to=None):
+    """Строки выручки (по инструментам) за период — для выгрузки в сводном отчёте."""
+    sql = """SELECT tr.revenue_date, t.serial_number AS tool_serial, c.name AS customer_name,
+                     tr.well_number, tr.work_qty, tr.work_unit, tr.standby_days, tr.amount
+             FROM tool_revenue tr
+             JOIN tools t ON t.id = tr.tool_id
+             LEFT JOIN customers c ON c.id = tr.customer_id
+             WHERE 1=1"""
+    params = []
+    if date_from:
+        sql += " AND tr.revenue_date >= %s"
+        params.append(date_from)
+    if date_to:
+        sql += " AND tr.revenue_date <= %s"
+        params.append(date_to)
+    sql += " ORDER BY tr.revenue_date, tr.id"
+    return db.query_all(sql, params)
+
+
 def _months_ago(n):
     today = date.today()
     year = today.year
