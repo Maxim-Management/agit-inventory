@@ -2,8 +2,9 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 
 from . import db
 from .auth import login_required, roles_required
-from .stock import stock_map, part_stock_value, avg_exchange_rate_all_receipts, guaranteed_resource_hours
+from .stock import stock_map, part_stock_value, avg_exchange_rate_all_receipts, guaranteed_resource_hours, GUARANTEED_RESOURCE_REASONS
 from .costing import unit_cost_rub
+from .analytics import REASON_LABELS
 
 bp = Blueprint("parts", __name__, url_prefix="/parts")
 
@@ -91,6 +92,50 @@ def list_parts():
     return render_template(
         "parts/list.html", rows=rows, q=q, tool_size=tool_size, status=status, tool_sizes=tool_sizes,
         status_labels=UNIT_STATUS_LABELS,
+    )
+
+
+@bp.route("/written-off")
+@login_required
+def written_off():
+    """Вкладка «Списанные компоненты» — серийные компоненты, списанные по
+    причине повреждения/износа/непригодности к дальнейшей эксплуатации
+    (тот же набор причин, что учитывается в «гарантированном ресурсе» —
+    см. app/stock.py: GUARANTEED_RESOURCE_REASONS). Заводской брак ('defect')
+    и прочие причины ('other') сюда не попадают — это не выработка ресурса
+    при эксплуатации, а отдельные случаи."""
+    q = request.args.get("q", "").strip()
+    tool_size = request.args.get("tool_size", "").strip()
+
+    placeholders = ",".join(["%s"] * len(GUARANTEED_RESOURCE_REASONS))
+    rows = db.query_all(
+        f"""SELECT w.id AS write_off_id, w.write_off_date, w.reason, w.act_number, w.note,
+                   u.id AS unit_id, u.serial_number, u.circulation_hours,
+                   p.id AS part_id, p.tool_size, p.part_name, p.part_number,
+                   sj.id AS job_id, sj.title AS job_title, sj.job_date
+            FROM write_offs w
+            JOIN units u ON u.id = w.unit_id
+            JOIN parts p ON p.id = w.part_id
+            LEFT JOIN service_jobs sj ON sj.id = w.job_id
+            WHERE w.unit_id IS NOT NULL AND w.reason IN ({placeholders})
+            ORDER BY w.write_off_date DESC, w.id DESC""",
+        list(GUARANTEED_RESOURCE_REASONS),
+    )
+
+    if q:
+        ql = q.lower()
+        rows = [r for r in rows if ql in (r["part_name"] or "").lower()
+                or ql in (r["part_number"] or "").lower()
+                or ql in (r["serial_number"] or "").lower()]
+    if tool_size:
+        rows = [r for r in rows if r["tool_size"] == tool_size]
+
+    tool_sizes = [r["tool_size"] for r in db.query_all(
+        "SELECT DISTINCT tool_size FROM parts WHERE tool_size != '' ORDER BY tool_size")]
+
+    return render_template(
+        "parts/written_off.html", rows=rows, q=q, tool_size=tool_size, tool_sizes=tool_sizes,
+        reason_labels=REASON_LABELS,
     )
 
 

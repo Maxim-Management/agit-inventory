@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Списанные компоненты — AGIT tool and components track{% endblock %}
+{% block content %}
+<div class="mb-4">
+  <h1 class="text-2xl font-semibold">Комплектующие</h1>
+  <div class="flex gap-4 text-sm text-slate-500 mt-2">
+    <a href="{{ url_for('parts.list_parts') }}" class="hover:text-slate-900 pb-1">Все компоненты</a>
+    <span class="font-medium text-slate-900 border-b-2 border-slate-900 pb-1">Списанные компоненты</span>
+  </div>
+</div>
+<p class="text-sm text-slate-500 mb-6">Серийные компоненты, списанные по причине повреждения, износа или непригодности к дальнейшей эксплуатации (учитываются в расчёте «гарантированного ресурса» на карточке детали). Заводской брак и списания по прочим причинам сюда не входят — см. общий список в разделе «Списания».</p>
+
+<form method="get" class="flex flex-wrap gap-3 mb-4">
+  <input type="text" name="q" value="{{ q }}" placeholder="Название, номенклатурный или серийный номер" class="border border-slate-300 rounded-lg px-3 py-2 text-sm flex-1 max-w-sm">
+  <select name="tool_size" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+    <option value="">Все типоразмеры</option>
+    {% for ts in tool_sizes %}
+    <option value="{{ ts }}" {{ 'selected' if ts == tool_size }}>{{ ts }}</option>
+    {% endfor %}
+  </select>
+  <button class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm">Найти</button>
+</form>
+
+<div class="bg-white border border-slate-200 rounded-xl overflow-x-auto">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-slate-500 text-left">
+    <tr>
+      <th class="px-4 py-2">Типоразмер</th>
+      <th class="px-4 py-2">Наименование</th>
+      <th class="px-4 py-2">Серийный №</th>
+      <th class="px-4 py-2 text-right">Наработка на момент списания, ч</th>
+      <th class="px-4 py-2">Дата списания</th>
+      <th class="px-4 py-2">Причина</th>
+      <th class="px-4 py-2">Работа</th>
+      <th class="px-4 py-2">Акт №</th>
+      <th class="px-4 py-2">Комментарий</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+    <tr class="border-t border-slate-100 hover:bg-slate-50">
+      <td class="px-4 py-2 text-slate-500">{{ r.tool_size }}</td>
+      <td class="px-4 py-2"><a href="{{ url_for('parts.detail', part_id=r.part_id) }}" class="text-blue-700 hover:underline">{{ r.part_name }}</a></td>
+      <td class="px-4 py-2">
+        <a href="{{ url_for('units.detail', unit_id=r.unit_id) }}" class="text-blue-700 hover:underline font-medium">{{ r.serial_number }}</a>
+      </td>
+      <td class="px-4 py-2 text-right">{{ r.circulation_hours|num if r.circulation_hours is not none else '—' }}</td>
+      <td class="px-4 py-2 text-slate-500">{{ r.write_off_date }}</td>
+      <td class="px-4 py-2">{{ reason_labels.get(r.reason, r.reason) }}</td>
+      <td class="px-4 py-2">
+        {% if r.job_id %}
+        <a href="{{ url_for('jobs.detail', job_id=r.job_id) }}" class="text-blue-700 hover:underline">{{ r.job_title or ('работа №' + r.job_id|string) }}</a>
+        {% else %}
+        <span class="text-slate-400">—</span>
+        {% endif %}
+      </td>
+      <td class="px-4 py-2 text-slate-500">{{ r.act_number or '—' }}</td>
+      <td class="px-4 py-2 text-slate-500">{{ r.note or '—' }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">Списанных компонентов пока нет.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

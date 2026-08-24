@@ -1,8 +1,14 @@
 {% extends "base.html" %}
 {% block title %}Комплектующие — AGIT tool and components track{% endblock %}
 {% block content %}
-<div class="flex items-center justify-between mb-6">
+<div class="mb-4">
   <h1 class="text-2xl font-semibold">Комплектующие</h1>
+  <div class="flex gap-4 text-sm text-slate-500 mt-2">
+    <span class="font-medium text-slate-900 border-b-2 border-slate-900 pb-1">Все компоненты</span>
+    <a href="{{ url_for('parts.written_off') }}" class="hover:text-slate-900 pb-1">Списанные компоненты</a>
+  </div>
+</div>
+<div class="flex items-center justify-end mb-6">
   <div class="flex gap-2">
     <a href="{{ url_for('forecast.index') }}" class="bg-slate-100 border border-slate-300 text-slate-700 text-sm px-4 py-2 rounded-lg hover:bg-slate-200">Прогноз заказа</a>
     {% if can_edit %}

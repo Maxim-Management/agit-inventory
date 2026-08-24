@@ -2,7 +2,7 @@ import csv
 import io
 import json
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, g, Response
+from flask import Blueprint, render_template, request, redirect, url_for, flash, g, Response, send_file
 
 from . import db
 from .auth import login_required, roles_required
@@ -10,6 +10,7 @@ from .jobs import list_jobs, job_totals, job_write_offs, JOB_TYPE_LABELS
 from .analytics import REASON_LABELS
 from . import tools as tools_mod
 from .stock import consume_from_batch, open_batches_for_part, batch_label
+from .writeoff_act import build_writeoff_act_docx
 
 bp = Blueprint("jobs", __name__, url_prefix="/jobs")
 
@@ -125,6 +126,35 @@ def detail(job_id):
         "jobs/detail.html", job=job, write_offs=write_offs, reason_labels=REASON_LABELS,
         job_type_labels=JOB_TYPE_LABELS, q=q, unit_candidates=unit_candidates, bulk_parts=bulk_parts,
         batches_by_part_json=batches_by_part_json, tools=tool_list,
+    )
+
+
+@bp.route("/<int:job_id>/writeoff-act.docx")
+@login_required
+def writeoff_act(job_id):
+    """Автоматическая выгрузка «Акта на списание материалов» (.docx) по всем
+    компонентам, списанным на эту работу — по форме, предоставленной
+    заказчиком (см. app/writeoff_act.py). В акт попадают ВСЕ списания по
+    работе независимо от причины (причина — сама по себе колонка акта), а
+    не только те, что учитываются в «гарантированном ресурсе»."""
+    job = db.query_one(
+        """SELECT sj.*, t.serial_number AS tool_serial FROM service_jobs sj
+           LEFT JOIN tools t ON t.id = sj.tool_id WHERE sj.id = %s""",
+        [job_id],
+    )
+    if not job:
+        flash("Работа не найдена.", "error")
+        return redirect(url_for("jobs.list_view"))
+    write_offs = job_write_offs(job_id)
+    if not write_offs:
+        flash("По этой работе ещё нет списанных компонентов — акт формировать не из чего.", "error")
+        return redirect(url_for("jobs.detail", job_id=job_id))
+    buf = build_writeoff_act_docx(job, write_offs, REASON_LABELS)
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name=f"akt_spisaniya_rabota_{job_id}.docx",
+        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
 
 
