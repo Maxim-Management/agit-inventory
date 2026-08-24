@@ -2,7 +2,7 @@
 {% block title %}Работа №{{ job.id }} — AGIT tool and components track{% endblock %}
 {% block content %}
 <a href="{{ url_for('jobs.list_view') }}" class="text-sm text-blue-700 hover:underline">&larr; К ремонтным работам</a>
-<h1 class="text-2xl font-semibold mt-2 mb-1">{{ job.title or (job_type_labels.get(job.job_type, job.job_type) + ' — ' + job.job_date) }}</h1>
+<h1 class="text-2xl font-semibold mt-2 mb-1">{{ job.title or (job_type_labels.get(job.job_type, job.job_type) ~ ' — ' ~ job.job_date) }}</h1>
 <p class="text-sm text-slate-500 mb-1">
   {{ job_type_labels.get(job.job_type, job.job_type) }} · {{ job.job_date }}
   {% if job.tool_serial %}· инструмент <a href="{{ url_for('tools.detail', tool_id=job.tool_id) }}" class="text-blue-700 hover:underline">{{ job.tool_serial }}</a>{% endif %}

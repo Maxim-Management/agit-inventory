@@ -187,24 +187,34 @@ def avg_exchange_rate_all_receipts(part_id):
     return float(row["avg_rate"])
 
 
+GUARANTEED_RESOURCE_REASONS = ("repair", "damage")
+
+
 def guaranteed_resource_hours(part_id):
     """"Гарантированный ресурс" компонента, ч — сколько наработки в среднем
-    выдерживает деталь до списания по износу/выходу из строя. Считается
-    вживую (по аналогии с part_stock_value) как средняя наработка
-    (units.circulation_hours) на момент списания среди списаний ЭТОЙ детали
-    с причиной "ремонт" (write_offs.reason = 'repair') — то есть именно
-    ремонт по факту износа/поломки, а не заводской брак ('defect') или
-    механическое повреждение ('damage'). Наработка серийной единицы после
-    списания больше не меняется (единица снята с эксплуатации), поэтому
-    circulation_hours на этот момент и есть её "стаж" до выбытия.
-    Возвращает None, если по этой детали ещё не было ни одного такого
-    списания серийной единицы (для несерийных расходников понятие
-    "гарантированного ресурса" неприменимо — там нет units.circulation_hours)."""
+    выдерживает деталь до списания по повреждению/износу/непригодности к
+    дальнейшей эксплуатации. Считается вживую (по аналогии с
+    part_stock_value) как средняя наработка (units.circulation_hours) на
+    момент списания среди списаний ЭТОЙ детали с причиной "ремонт" (износ/
+    выход из строя по факту эксплуатации) или "повреждение"
+    (GUARANTEED_RESOURCE_REASONS = 'repair', 'damage') — то есть реальная
+    выработка ресурса, а не заводской брак ('defect', не связан с реальной
+    эксплуатацией) или прочие причины ('other', слишком неопределённая
+    категория). Учитывается и списание прямо со страницы инструмента (кнопка
+    «Списать» рядом со «Снять» у установленного компонента) — оно проходит
+    через тот же write_offs с тем же набором причин. Наработка серийной
+    единицы после списания больше не меняется (единица снята с
+    эксплуатации), поэтому circulation_hours на этот момент и есть её
+    "стаж" до выбытия. Возвращает None, если по этой детали ещё не было ни
+    одного такого списания серийной единицы (для несерийных расходников
+    понятие "гарантированного ресурса" неприменимо — там нет
+    units.circulation_hours)."""
+    placeholders = ",".join(["%s"] * len(GUARANTEED_RESOURCE_REASONS))
     row = db.query_one(
-        """SELECT AVG(u.circulation_hours) AS avg_h, COUNT(*) AS cnt
-           FROM write_offs w JOIN units u ON u.id = w.unit_id
-           WHERE w.part_id = %s AND w.reason = 'repair' AND w.unit_id IS NOT NULL""",
-        [part_id],
+        f"""SELECT AVG(u.circulation_hours) AS avg_h, COUNT(*) AS cnt
+            FROM write_offs w JOIN units u ON u.id = w.unit_id
+            WHERE w.part_id = %s AND w.reason IN ({placeholders}) AND w.unit_id IS NOT NULL""",
+        [part_id, *GUARANTEED_RESOURCE_REASONS],
     )
     if not row or not row["cnt"]:
         return None

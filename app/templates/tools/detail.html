@@ -58,13 +58,15 @@
           <td class="py-1"><a href="{{ url_for('units.detail', unit_id=u.id) }}" class="text-blue-700 hover:underline">{{ u.serial_number }}</a></td>
           <td class="py-1 text-slate-500">{{ u.part_name }}</td>
           <td class="py-1">{{ u.circulation_hours|num }}</td>
-          <td class="py-1 text-right">
+          <td class="py-1 text-right whitespace-nowrap">
             {% if can_edit %}
-            <form method="post" action="{{ url_for('tools.uninstall', tool_id=tool.id) }}">
+            <form method="post" action="{{ url_for('tools.uninstall', tool_id=tool.id) }}" class="inline" onsubmit="return confirm('Снять компонент с инструмента и вернуть на склад (без списания)?');">
               <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="unit_id" value="{{ u.id }}">
-              <button class="text-red-700 hover:underline text-xs">Снять</button>
+              <button class="text-slate-600 hover:underline text-xs">На склад</button>
             </form>
+            <span class="text-slate-300 mx-1">·</span>
+            <a href="{{ url_for('units.writeoff', unit_id=u.id) }}" class="text-red-700 hover:underline text-xs" title="Компонент повреждён, изношен или непригоден к дальнейшей эксплуатации">Списать</a>
             {% endif %}
           </td>
         </tr>

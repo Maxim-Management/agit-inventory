@@ -200,7 +200,15 @@ def writeoff(unit_id):
         )
         if unit.get("receipt_id"):
             consume_from_batch(unit["receipt_id"], 1)
-        db.execute("UPDATE units SET status = 'written_off' WHERE id = %s", [unit_id])
+        # Компонент мог быть установлен на инструменте (списание прямо со
+        # страницы инструмента, кнопка «Списать» рядом со «Снять») — снимаем
+        # его с инструмента одновременно со списанием, иначе он останется
+        # висеть в «Установленные компоненты» уже списанным (см. аналогичную
+        # логику в app/routes_jobs.py: consume_unit()).
+        db.execute(
+            "UPDATE units SET status = 'written_off', installed_on_tool_id = NULL, installed_on = '' WHERE id = %s",
+            [unit_id],
+        )
         flash(f"Компонент {unit['serial_number']} списан.", "ok")
         return redirect(url_for("units.detail", unit_id=unit_id))
 
