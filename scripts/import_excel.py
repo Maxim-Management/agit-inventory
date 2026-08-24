@@ -195,6 +195,18 @@ def import_parts(ws):
         if existing:
             part_id = existing["id"]
             updated += 1
+            # Пошлина могла остаться NULL у деталей, заведённых до того, как
+            # этот скрипт стал переносить её из Excel в карточку детали (или
+            # до того, как в Excel вообще появилась колонка "Tax, %") — при
+            # повторном запуске импорта для уже существующей детали её поля
+            # раньше вообще не трогались. Подтягиваем пошлину сейчас, но
+            # ТОЛЬКО если в карточке она ещё не заполнена — так уже
+            # отредактированные вручную значения не затираются.
+            if duty_percent is not None:
+                db.execute(
+                    "UPDATE parts SET customs_duty_percent = %s WHERE id = %s AND customs_duty_percent IS NULL",
+                    [duty_percent, part_id],
+                )
         else:
             part_id = db.execute_returning_id(
                 """INSERT INTO parts (tool_size, part_name, part_number, category, specification,
