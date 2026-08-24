@@ -54,14 +54,25 @@ def create_app(test_config=None):
 
     @app.template_filter("num")
     def fmt_num(value, digits=2):
+        """Форматирует число как в денежном/валютном отображении: разряды
+        (тысячи, миллионы, ...) разделяются неразрывным пробелом, дробная
+        часть — запятой (по русской типографике), например 1 234 567,89.
+        Используется для ВСЕХ чисел в интерфейсе (не только сумм в рублях) —
+        для количеств/часов, которые обычно меньше 1000, группировка разрядов
+        просто не проявляется, так что это безопасно и единообразно."""
         if value is None:
             return "—"
         try:
             f = float(value)
         except (TypeError, ValueError):
             return value
+        sign = "-" if f < 0 else ""
+        f = abs(f)
         if f == int(f):
-            return str(int(f))
-        return f"{f:.{digits}f}"
+            return sign + f"{int(f):,}".replace(",", " ")
+        grouped = f"{f:,.{digits}f}"
+        int_part, _, dec_part = grouped.partition(".")
+        int_part = int_part.replace(",", " ")
+        return f"{sign}{int_part},{dec_part}"
 
     return app
