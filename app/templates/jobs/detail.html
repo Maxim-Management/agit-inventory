@@ -63,45 +63,51 @@
     {% endif %}
 
     {% if can_edit %}
-    <div class="mt-4 pt-4 border-t border-slate-100 space-y-4">
-      <div>
-        <p class="text-xs font-medium text-slate-500 mb-2">Списать серийный компонент</p>
-        <form method="get" class="flex gap-2 mb-2">
-          <input type="text" name="q" value="{{ q }}" placeholder="Серийный № или название" class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm flex-1">
-          <button class="bg-slate-100 border border-slate-300 rounded-lg px-3 py-1.5 text-sm">Найти</button>
-        </form>
-        {% for c in unit_candidates %}
-        <div class="flex items-center gap-2 text-sm border-t border-slate-100 py-1.5">
-          <span class="flex-1">{{ c.serial_number }} — {{ c.part_name }}{% if c.status == 'installed' %} <span class="text-orange-600 text-xs">(установлен)</span>{% endif %}</span>
-          <form method="post" action="{{ url_for('jobs.consume_unit', job_id=job.id) }}" class="inline">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="unit_id" value="{{ c.id }}">
-            <input type="hidden" name="write_off_date" value="{{ job.job_date }}">
-            <input type="hidden" name="reason" value="repair">
-            <button class="text-blue-700 hover:underline">Списать</button>
-          </form>
-          {% if c.status == 'installed' %}
-          <form method="post" action="{{ url_for('jobs.transfer_unit', job_id=job.id) }}" class="inline" onsubmit="return confirm('Снять компонент с инструмента и вернуть на склад без списания?');">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <input type="hidden" name="unit_id" value="{{ c.id }}">
-            <button class="text-slate-600 hover:underline">Перевести на склад</button>
-          </form>
-          {% endif %}
-        </div>
-        {% endfor %}
-      </div>
-      <div>
-        <p class="text-xs font-medium text-slate-500 mb-2">Списать расходник по количеству</p>
-        <form method="post" action="{{ url_for('jobs.consume_bulk', job_id=job.id) }}" class="flex flex-wrap items-center gap-2 text-sm">
+    <div class="mt-4 pt-4 border-t border-slate-100">
+      <p class="text-xs font-medium text-slate-500 mb-2">Списать компонент</p>
+      <select id="write_off_part_id" class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm w-full mb-2">
+        <option value="">Выберите деталь…</option>
+        {% if serialized_parts %}
+        <optgroup label="Серийные компоненты">
+          {% for p in serialized_parts %}
+          <option value="{{ p.id }}" data-serialized="1">{{ p.part_name }} ({{ p.part_number }})</option>
+          {% endfor %}
+        </optgroup>
+        {% endif %}
+        {% if bulk_parts %}
+        <optgroup label="Расходники">
+          {% for p in bulk_parts %}
+          <option value="{{ p.id }}" data-serialized="0">{{ p.part_name }} ({{ p.part_number }})</option>
+          {% endfor %}
+        </optgroup>
+        {% endif %}
+      </select>
+
+      {# --- несерийный расходник: количество + партия + причина --- #}
+      <form id="bulk_write_off_form" method="post" action="{{ url_for('jobs.consume_bulk', job_id=job.id) }}" class="hidden flex flex-wrap items-center gap-2 text-sm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="write_off_date" value="{{ job.job_date }}">
+        <input type="hidden" name="part_id" id="bulk_part_id">
+        <select name="receipt_id" id="bulk_receipt_id" class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm w-full sm:w-auto"></select>
+        <input type="number" step="0.01" name="quantity" value="1" class="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
+        <select name="reason" class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
+          {% for k, v in reason_labels.items() %}
+          <option value="{{ k }}" {{ 'selected' if k=='repair' }}>{{ v }}</option>
+          {% endfor %}
+        </select>
+        <button class="bg-slate-900 text-white rounded-lg px-3 py-1.5 text-sm hover:bg-slate-800">Списать</button>
+      </form>
+      <p id="bulk_hint" class="hidden text-xs text-slate-400 mt-1">По умолчанию списывается с самой старой партии с остатком (FIFO) — можно выбрать другую.</p>
+
+      {# --- серийный компонент: серийный № выбирается во всплывающем окне, затем причина --- #}
+      <div id="serial_write_off_block" class="hidden">
+        <button type="button" id="open_serial_modal_btn" class="bg-white border border-slate-300 text-slate-700 rounded-lg px-3 py-1.5 text-sm hover:bg-slate-50">Выбрать серийный номер…</button>
+        <span id="selected_serial_label" class="text-sm text-slate-500 ml-2"></span>
+
+        <form id="serial_write_off_form" method="post" action="{{ url_for('jobs.consume_unit', job_id=job.id) }}" class="hidden flex flex-wrap items-center gap-2 text-sm mt-2">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="write_off_date" value="{{ job.job_date }}">
-          <select name="part_id" id="bulk_part_id" class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm flex-1">
-            {% for p in bulk_parts %}
-            <option value="{{ p.id }}">{{ p.part_name }} ({{ p.part_number }})</option>
-            {% endfor %}
-          </select>
-          <select name="receipt_id" id="bulk_receipt_id" class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm w-full sm:w-auto"></select>
-          <input type="number" step="0.01" name="quantity" value="1" class="w-20 border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
+          <input type="hidden" name="unit_id" id="serial_unit_id">
           <select name="reason" class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
             {% for k, v in reason_labels.items() %}
             <option value="{{ k }}" {{ 'selected' if k=='repair' }}>{{ v }}</option>
@@ -109,35 +115,158 @@
           </select>
           <button class="bg-slate-900 text-white rounded-lg px-3 py-1.5 text-sm hover:bg-slate-800">Списать</button>
         </form>
-        <p class="text-xs text-slate-400 mt-1">По умолчанию списывается с самой старой партии с остатком (FIFO) — можно выбрать другую.</p>
-        <script>
-          (function () {
-            const batchesByPart = {{ batches_by_part_json|safe }};
-            const partSelect = document.getElementById('bulk_part_id');
-            const receiptSelect = document.getElementById('bulk_receipt_id');
-            function refreshBatches() {
-              const batches = batchesByPart[partSelect.value] || [];
-              receiptSelect.innerHTML = '';
-              if (!batches.length) {
-                const opt = document.createElement('option');
-                opt.value = '';
-                opt.textContent = 'Нет открытых партий — без привязки';
-                receiptSelect.appendChild(opt);
-                return;
-              }
-              batches.forEach(b => {
-                const opt = document.createElement('option');
-                opt.value = b.id;
-                opt.textContent = b.label;
-                receiptSelect.appendChild(opt);
-              });
-            }
-            partSelect.addEventListener('change', refreshBatches);
-            refreshBatches();
-          })();
-        </script>
+
+        <form id="transfer_write_off_form" method="post" action="{{ url_for('jobs.transfer_unit', job_id=job.id) }}" class="hidden">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="unit_id" id="transfer_unit_id">
+        </form>
       </div>
     </div>
+
+    {# --- модальное окно выбора серийного номера --- #}
+    <div id="serial_modal" class="hidden fixed inset-0 bg-slate-900/40 flex items-center justify-center z-50 p-4">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <h3 class="font-semibold text-sm">Выберите серийный номер</h3>
+          <button type="button" id="close_serial_modal_btn" class="text-slate-400 hover:text-slate-700 text-xl leading-none">&times;</button>
+        </div>
+        <div class="px-5 py-3 border-b border-slate-100">
+          <input type="text" id="serial_modal_search" placeholder="Поиск по серийному номеру" class="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-sm">
+        </div>
+        <div id="serial_modal_list" class="overflow-y-auto px-5 py-2 text-sm flex-1"></div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        const batchesByPart = {{ batches_by_part_json|safe }};
+        const unitsByPart = {{ units_by_part_json|safe }};
+
+        const partSelect = document.getElementById('write_off_part_id');
+        const bulkForm = document.getElementById('bulk_write_off_form');
+        const bulkPartInput = document.getElementById('bulk_part_id');
+        const bulkReceiptSelect = document.getElementById('bulk_receipt_id');
+        const bulkHint = document.getElementById('bulk_hint');
+        const serialBlock = document.getElementById('serial_write_off_block');
+        const serialForm = document.getElementById('serial_write_off_form');
+        const transferForm = document.getElementById('transfer_write_off_form');
+        const serialUnitIdInput = document.getElementById('serial_unit_id');
+        const transferUnitIdInput = document.getElementById('transfer_unit_id');
+        const selectedSerialLabel = document.getElementById('selected_serial_label');
+        const openModalBtn = document.getElementById('open_serial_modal_btn');
+        const closeModalBtn = document.getElementById('close_serial_modal_btn');
+        const modal = document.getElementById('serial_modal');
+        const modalList = document.getElementById('serial_modal_list');
+        const modalSearch = document.getElementById('serial_modal_search');
+
+        function refreshBulkBatches() {
+          const batches = batchesByPart[bulkPartInput.value] || [];
+          bulkReceiptSelect.innerHTML = '';
+          if (!batches.length) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'Нет открытых партий — без привязки';
+            bulkReceiptSelect.appendChild(opt);
+            return;
+          }
+          batches.forEach(b => {
+            const opt = document.createElement('option');
+            opt.value = b.id;
+            opt.textContent = b.label;
+            bulkReceiptSelect.appendChild(opt);
+          });
+        }
+
+        function renderModalList() {
+          const units = unitsByPart[partSelect.value] || [];
+          const q = modalSearch.value.trim().toLowerCase();
+          const filtered = q ? units.filter(u => u.serial_number.toLowerCase().includes(q)) : units;
+          modalList.innerHTML = '';
+          if (!filtered.length) {
+            const empty = document.createElement('p');
+            empty.className = 'text-slate-400 text-center py-4';
+            empty.textContent = units.length ? 'Ничего не найдено.' : 'Нет доступных единиц (на складе или на инструменте этой работы).';
+            modalList.appendChild(empty);
+            return;
+          }
+          filtered.forEach(u => {
+            const row = document.createElement('div');
+            row.className = 'flex items-center gap-2 border-t border-slate-100 first:border-t-0 py-2';
+            const label = document.createElement('span');
+            label.className = 'flex-1';
+            label.textContent = u.serial_number;
+            if (u.status === 'installed') {
+              const badge = document.createElement('span');
+              badge.className = 'text-orange-600 text-xs ml-1';
+              badge.textContent = '(установлен)';
+              label.appendChild(badge);
+            }
+            row.appendChild(label);
+            const pickBtn = document.createElement('button');
+            pickBtn.type = 'button';
+            pickBtn.className = 'text-blue-700 hover:underline';
+            pickBtn.textContent = 'Выбрать';
+            pickBtn.addEventListener('click', () => selectUnit(u));
+            row.appendChild(pickBtn);
+            if (u.status === 'installed') {
+              const transferBtn = document.createElement('button');
+              transferBtn.type = 'button';
+              transferBtn.className = 'text-slate-600 hover:underline';
+              transferBtn.textContent = 'На склад';
+              transferBtn.addEventListener('click', () => {
+                closeModal();
+                if (confirm('Снять компонент с инструмента и вернуть на склад без списания?')) {
+                  transferUnitIdInput.value = u.id;
+                  transferForm.submit();
+                }
+              });
+              row.appendChild(transferBtn);
+            }
+            modalList.appendChild(row);
+          });
+        }
+
+        function selectUnit(u) {
+          serialUnitIdInput.value = u.id;
+          selectedSerialLabel.textContent = u.serial_number + (u.status === 'installed' ? ' (установлен)' : '');
+          serialForm.classList.remove('hidden');
+          closeModal();
+        }
+
+        function openModal() {
+          modalSearch.value = '';
+          renderModalList();
+          modal.classList.remove('hidden');
+          modalSearch.focus();
+        }
+
+        function closeModal() {
+          modal.classList.add('hidden');
+        }
+
+        function refreshSelection() {
+          const opt = partSelect.options[partSelect.selectedIndex];
+          const serialized = !!(opt && opt.dataset.serialized === '1');
+          const hasPart = !!partSelect.value;
+          bulkForm.classList.toggle('hidden', !(hasPart && !serialized));
+          bulkHint.classList.toggle('hidden', !(hasPart && !serialized));
+          serialBlock.classList.toggle('hidden', !(hasPart && serialized));
+          serialForm.classList.add('hidden');
+          serialUnitIdInput.value = '';
+          selectedSerialLabel.textContent = '';
+          if (hasPart && !serialized) {
+            bulkPartInput.value = partSelect.value;
+            refreshBulkBatches();
+          }
+        }
+
+        partSelect.addEventListener('change', refreshSelection);
+        openModalBtn.addEventListener('click', openModal);
+        closeModalBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+        modalSearch.addEventListener('input', renderModalList);
+      })();
+    </script>
     {% endif %}
   </div>
 

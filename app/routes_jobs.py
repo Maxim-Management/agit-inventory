@@ -96,21 +96,13 @@ def detail(job_id):
     job.update(job_totals(job))
     write_offs = job_write_offs(job_id)
 
-    q = request.args.get("q", "").strip()
-    unit_candidates = []
-    if q:
-        # Ищем и свободные компоненты со склада, и компоненты, уже
-        # установленные на ИНСТРУМЕНТЕ этой работы (их тоже можно списать
-        # или, если они не под замену, а просто сняты, вернуть на склад —
-        # см. кнопку "Перевести на склад" в шаблоне).
-        unit_candidates = db.query_all(
-            """SELECT u.id, u.serial_number, u.status, p.part_name, p.part_number
-               FROM units u JOIN parts p ON p.id = u.part_id
-               WHERE (u.serial_number LIKE %s OR p.part_name LIKE %s)
-                 AND (u.status = 'in_stock' OR (u.status = 'installed' AND u.installed_on_tool_id = %s))
-               ORDER BY u.serial_number LIMIT 20""",
-            [f"%{q}%", f"%{q}%", job["tool_id"]],
-        )
+    # Единый выбор детали для списания на работу (серийная или несерийная —
+    # см. шаблон: один выпадающий список на обе группы). Для несерийных
+    # деталей сразу нужен остаток по партиям (как раньше), для серийных —
+    # список конкретных единиц, доступных для выбора во всплывающем окне:
+    # свободные на складе ЛЮБЫЕ, плюс уже установленные, но именно на
+    # ИНСТРУМЕНТЕ этой работы (их тоже можно списать при замене, или вернуть
+    # на склад без списания — см. кнопку "Перевести на склад" в шаблоне).
     bulk_parts = db.query_all(
         "SELECT id, part_name, part_number FROM parts WHERE is_serialized = %s ORDER BY part_name",
         [False],
@@ -120,12 +112,27 @@ def detail(job_id):
                                   f"{b.get('receipt_date') or ''} · остаток {float(b['remaining_quantity']):g}"}
         for b in open_batches_for_part(p["id"])
     ] for p in bulk_parts})
+
+    serialized_parts = db.query_all(
+        "SELECT id, part_name, part_number FROM parts WHERE is_serialized = %s ORDER BY part_name",
+        [True],
+    )
+    units_by_part_json = json.dumps({str(p["id"]): [
+        {"id": u["id"], "serial_number": u["serial_number"], "status": u["status"]}
+        for u in db.query_all(
+            """SELECT id, serial_number, status FROM units
+               WHERE part_id = %s AND (status = 'in_stock' OR (status = 'installed' AND installed_on_tool_id = %s))
+               ORDER BY serial_number""",
+            [p["id"], job["tool_id"]],
+        )
+    ] for p in serialized_parts})
+
     tool_list = db.query_all("SELECT id, serial_number, tool_size FROM tools ORDER BY serial_number")
 
     return render_template(
         "jobs/detail.html", job=job, write_offs=write_offs, reason_labels=REASON_LABELS,
-        job_type_labels=JOB_TYPE_LABELS, q=q, unit_candidates=unit_candidates, bulk_parts=bulk_parts,
-        batches_by_part_json=batches_by_part_json, tools=tool_list,
+        job_type_labels=JOB_TYPE_LABELS, bulk_parts=bulk_parts, serialized_parts=serialized_parts,
+        batches_by_part_json=batches_by_part_json, units_by_part_json=units_by_part_json, tools=tool_list,
     )
 
 

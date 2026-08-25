@@ -13,12 +13,20 @@ bp = Blueprint("dashboard", __name__)
 @login_required
 def index():
     total_parts = db.query_one("SELECT COUNT(*) AS c FROM parts")["c"]
-    total_in_stock = db.query_one("SELECT COUNT(*) AS c FROM units WHERE status = 'in_stock'")["c"]
     total_installed = db.query_one("SELECT COUNT(*) AS c FROM units WHERE status = 'installed'")["c"]
     total_written_off = db.query_one("SELECT COUNT(*) AS c FROM units WHERE status = 'written_off'")["c"]
     stock_value_rub = total_stock_value()
 
     stock = stock_map()
+    # «На складе» — общий остаток по ВСЕМ деталям, не задействованным на
+    # инструменте: и серийные компоненты (единицы в статусе 'in_stock' —
+    # 'installed'/'paired'/'written_off' сюда не входят), и несерийные
+    # расходники (масло, уплотнения и т.п., по количеству) — единый расчёт
+    # stock_map() (см. app/stock.py), тот же, что используется в справочнике
+    # «Комплектующие», аналитике и прогнозе заказа. Раньше здесь считались
+    # только серийные единицы — расходники в общую цифру не попадали вовсе.
+    total_in_stock = round(sum(stock.values()), 2)
+
     parts = db.query_all("SELECT id, part_name, part_number, tool_size, min_stock_qty FROM parts")
     low_stock = sorted(
         (
