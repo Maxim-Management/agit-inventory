@@ -26,22 +26,22 @@
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Выручка, ₽</div>
-    <div class="text-xl font-semibold mt-1">{{ tool.cumulative_revenue|num }}</div>
+    <div class="text-xl font-semibold mt-1">{{ tool.cumulative_revenue|money }}</div>
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Стоимость ремонтов, ₽</div>
-    <div class="text-xl font-semibold mt-1">{{ tool.jobs_cost|num }}</div>
+    <div class="text-xl font-semibold mt-1">{{ tool.jobs_cost|money }}</div>
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Начисленная амортизация, ₽</div>
-    <div class="text-xl font-semibold mt-1">{{ tool.depreciation.accrued_rub|num }}</div>
+    <div class="text-xl font-semibold mt-1">{{ tool.depreciation.accrued_rub|money }}</div>
     <div class="text-xs text-slate-400 mt-0.5">
       {% if not tool.depreciation.has_data %}не задана себестоимость и/или дата ввода{% else %}{{ tool.depreciation.months_elapsed }} из {{ tool.depreciation.months_total }} мес.{% if tool.depreciation.fully_depreciated %} · полностью{% endif %}{% endif %}
     </div>
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Рентабельность, ₽</div>
-    <div class="text-xl font-semibold mt-1 {{ 'text-green-700' if tool.profitability >= 0 else 'text-red-700' }}">{{ tool.profitability|num }}</div>
+    <div class="text-xl font-semibold mt-1 {{ 'text-green-700' if tool.profitability >= 0 else 'text-red-700' }}">{{ tool.profitability|money }}</div>
   </div>
 </div>
 <p class="text-xs text-slate-400 mb-6">Рентабельность = выручка − (начисленная амортизация + стоимость ремонтов).</p>
@@ -146,48 +146,49 @@
   </div>
 </div>
 
-<div class="grid md:grid-cols-2 gap-6">
+<div class="space-y-6">
   <div class="bg-white border border-slate-200 rounded-xl p-5">
     <h2 class="font-semibold mb-3">Выручка</h2>
     {% if revenue_history %}
+    <div class="overflow-x-auto">
     <table class="w-full text-sm">
       <thead class="text-slate-500 text-left">
         <tr>
-          <th class="py-1">Дата</th><th class="py-1">Заказчик</th><th class="py-1">Скв. №</th>
-          <th class="py-1 text-right">Работа</th><th class="py-1 text-right">Дежурство, сут</th>
-          <th class="py-1 text-right">Часы в наработку</th>
-          <th class="py-1 text-right">Сумма, ₽</th><th class="py-1">Примечание</th>{% if is_admin %}<th class="py-1"></th>{% endif %}
+          <th class="py-1 px-3">Дата</th><th class="py-1 px-3">Заказчик</th><th class="py-1 px-3">Скв. №</th>
+          <th class="py-1 px-3 text-right">Работа</th><th class="py-1 px-3 text-right">Дежурство, сут</th>
+          <th class="py-1 px-3 text-right">Часы в наработку</th>
+          <th class="py-1 px-3 text-right">Сумма, ₽</th><th class="py-1 px-3">Примечание</th>{% if is_admin %}<th class="py-1 px-3"></th>{% endif %}
         </tr>
       </thead>
       <tbody>
         {% for r in revenue_history %}
         {% if is_admin and not r.customer_id %}
         <tr class="border-t border-slate-100">
-          <td class="py-1"><input type="date" name="revenue_date" form="revenue-edit-{{ r.id }}" value="{{ r.revenue_date }}" class="w-32 border border-slate-200 rounded px-1 py-0.5 text-xs"></td>
-          <td class="py-1 text-slate-400">—</td>
-          <td class="py-1 text-slate-400">—</td>
-          <td class="py-1 text-right text-slate-400">—</td>
-          <td class="py-1 text-right text-slate-400">—</td>
-          <td class="py-1 text-right text-slate-400">—</td>
-          <td class="py-1 text-right"><input type="number" step="0.01" name="amount" form="revenue-edit-{{ r.id }}" value="{{ r.amount }}" class="w-20 border border-slate-200 rounded px-1 py-0.5 text-xs text-right"></td>
-          <td class="py-1"><input name="note" form="revenue-edit-{{ r.id }}" value="{{ r.note }}" class="w-full border border-slate-200 rounded px-1 py-0.5 text-xs"></td>
-          <td class="py-1 text-right whitespace-nowrap">
+          <td class="py-1.5 px-3"><input type="date" name="revenue_date" form="revenue-edit-{{ r.id }}" value="{{ r.revenue_date }}" class="w-32 border border-slate-200 rounded px-1 py-0.5 text-xs"></td>
+          <td class="py-1.5 px-3 text-slate-400">—</td>
+          <td class="py-1.5 px-3 text-slate-400">—</td>
+          <td class="py-1.5 px-3 text-right text-slate-400">—</td>
+          <td class="py-1.5 px-3 text-right text-slate-400">—</td>
+          <td class="py-1.5 px-3 text-right text-slate-400">—</td>
+          <td class="py-1.5 px-3 text-right"><input type="number" step="0.01" name="amount" form="revenue-edit-{{ r.id }}" value="{{ r.amount }}" class="w-20 border border-slate-200 rounded px-1 py-0.5 text-xs text-right"></td>
+          <td class="py-1.5 px-3"><input name="note" form="revenue-edit-{{ r.id }}" value="{{ r.note }}" class="w-full border border-slate-200 rounded px-1 py-0.5 text-xs"></td>
+          <td class="py-1.5 px-3 text-right whitespace-nowrap">
             <button type="submit" form="revenue-edit-{{ r.id }}" class="text-blue-700 hover:underline text-xs">✓</button>
             <button type="submit" form="revenue-delete-{{ r.id }}" class="text-red-700 hover:underline text-xs ml-2">✕</button>
           </td>
         </tr>
         {% else %}
         <tr class="border-t border-slate-100">
-          <td class="py-1">{{ r.revenue_date }}</td>
-          <td class="py-1 text-slate-500">{{ r.customer_name or '—' }}</td>
-          <td class="py-1 text-slate-500">{{ r.well_number or '—' }}</td>
-          <td class="py-1 text-right">{{ r.work_qty|num(2) if r.work_qty is not none else '—' }}{% if r.work_qty is not none %} {{ 'ч' if r.work_unit == 'hour' else 'сут' }}{% endif %}</td>
-          <td class="py-1 text-right">{{ r.standby_days|num(2) if r.standby_days is not none else '—' }}</td>
-          <td class="py-1 text-right">{{ r.usage_hours|num(2) if r.usage_hours is not none else '—' }}</td>
-          <td class="py-1 text-right">{{ r.amount|num }}</td>
-          <td class="py-1 text-slate-500">{{ r.note }}</td>
+          <td class="py-1.5 px-3">{{ r.revenue_date }}</td>
+          <td class="py-1.5 px-3 text-slate-500">{{ r.customer_name or '—' }}</td>
+          <td class="py-1.5 px-3 text-slate-500">{{ r.well_number or '—' }}</td>
+          <td class="py-1.5 px-3 text-right">{{ r.work_qty|num(2) if r.work_qty is not none else '—' }}{% if r.work_qty is not none %} {{ 'ч' if r.work_unit == 'hour' else 'сут' }}{% endif %}</td>
+          <td class="py-1.5 px-3 text-right">{{ r.standby_days|num(2) if r.standby_days is not none else '—' }}</td>
+          <td class="py-1.5 px-3 text-right">{{ r.usage_hours|num(2) if r.usage_hours is not none else '—' }}</td>
+          <td class="py-1.5 px-3 text-right">{{ r.amount|money }}</td>
+          <td class="py-1.5 px-3 text-slate-500">{{ r.note }}</td>
           {% if is_admin %}
-          <td class="py-1 text-right whitespace-nowrap">
+          <td class="py-1.5 px-3 text-right whitespace-nowrap">
             <button type="submit" form="revenue-delete-{{ r.id }}" class="text-red-700 hover:underline text-xs">✕</button>
           </td>
           {% endif %}
@@ -196,6 +197,7 @@
         {% endfor %}
       </tbody>
     </table>
+    </div>
     {% if is_admin %}
     {% for r in revenue_history %}
     {% if not r.customer_id %}
@@ -309,7 +311,7 @@
         <tr class="border-t border-slate-100">
           <td class="py-1"><a href="{{ url_for('jobs.detail', job_id=j.id) }}" class="text-blue-700 hover:underline">{{ j.job_date }}</a></td>
           <td class="py-1 text-slate-500">{{ j.title or '—' }}</td>
-          <td class="py-1 text-right">{{ j.total_cost|num }}</td>
+          <td class="py-1 text-right">{{ j.total_cost|money }}</td>
         </tr>
         {% endfor %}
       </tbody>

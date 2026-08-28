@@ -31,7 +31,7 @@
   <button class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm">Фильтр</button>
 </form>
 
-<p class="text-sm text-slate-500 mb-4">Суммарная стоимость по выбранным работам: <span class="font-semibold text-slate-800">{{ grand_total|num }} ₽</span></p>
+<p class="text-sm text-slate-500 mb-4">Суммарная стоимость по выбранным работам: <span class="font-semibold text-slate-800">{{ grand_total|money }} ₽</span></p>
 
 <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
 <table class="w-full text-sm">
@@ -52,11 +52,11 @@
       <td class="px-4 py-2 text-slate-500">{{ j.work_order_number or '—' }}</td>
       <td class="px-4 py-2 text-slate-500">{% if j.tool_serial %}<a href="{{ url_for('tools.detail', tool_id=j.tool_id) }}" class="text-blue-700 hover:underline">{{ j.tool_serial }}</a>{% else %}—{% endif %}</td>
       <td class="px-4 py-2 text-slate-500">{{ j.title or '—' }}</td>
-      <td class="px-4 py-2 text-right">{{ j.parts_cost|num }}</td>
-      <td class="px-4 py-2 text-right">{{ j.service_center_cost|num }}</td>
-      <td class="px-4 py-2 text-right">{{ j.labor_cost|num }}</td>
-      <td class="px-4 py-2 text-right">{{ j.other_cost|num }}</td>
-      <td class="px-4 py-2 text-right font-semibold">{{ j.total_cost|num }}</td>
+      <td class="px-4 py-2 text-right">{{ j.parts_cost|money }}</td>
+      <td class="px-4 py-2 text-right">{{ j.service_center_cost|money }}</td>
+      <td class="px-4 py-2 text-right">{{ j.labor_cost|money }}</td>
+      <td class="px-4 py-2 text-right">{{ j.other_cost|money }}</td>
+      <td class="px-4 py-2 text-right font-semibold">{{ j.total_cost|money }}</td>
     </tr>
     {% else %}
     <tr><td colspan="10" class="px-4 py-6 text-center text-slate-400">Работ пока нет.</td></tr>

@@ -39,10 +39,10 @@
       <td class="px-4 py-2 text-slate-500 align-top">{{ c.contract_number or '—' }}</td>
       <td class="px-4 py-2 text-slate-500 align-top">
         {% for r in c.rates_summary %}
-        <div class="whitespace-nowrap">{{ r.size }}": {{ r.work_rate|num }} ₽/{{ work_rate_unit_labels[r.unit] }} · деж. {{ r.standby_rate_rub_per_day|num }} ₽/сут</div>
+        <div class="whitespace-nowrap">{{ r.size }}": {{ r.work_rate|money }} ₽/{{ work_rate_unit_labels[r.unit] }} · деж. {{ r.standby_rate_rub_per_day|money }} ₽/сут</div>
         {% endfor %}
       </td>
-      <td class="px-4 py-2 text-right align-top">{{ c.revenue_total|num }}</td>
+      <td class="px-4 py-2 text-right align-top">{{ c.revenue_total|money }}</td>
       <td class="px-4 py-2 text-right align-top">
         {% if can_edit %}
         <a href="{{ url_for('customers.edit_customer', customer_id=c.id) }}" class="text-blue-700 hover:underline text-xs">Редактировать</a>

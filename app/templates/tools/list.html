@@ -2,7 +2,7 @@
 {% block title %}Инструменты — AGIT tool and components track{% endblock %}
 {% block content %}
 <div class="mb-4">
-  <h1 class="text-2xl font-semibold">Инструменты (буровые компоновки)</h1>
+  <h1 class="text-2xl font-semibold">Инструменты</h1>
   <div class="flex gap-4 text-sm text-slate-500 mt-2">
     <span class="font-medium text-slate-900 border-b-2 border-slate-900 pb-1">Список инструментов</span>
     <a href="{{ url_for('customers.list_view') }}" class="hover:text-slate-900 pb-1">Заказчики</a>
@@ -44,10 +44,10 @@
       <td class="px-4 py-2 text-slate-500">{{ t.tool_size or '—' }}</td>
       <td class="px-4 py-2">{{ status_labels.get(t.status, t.status) }}</td>
       <td class="px-4 py-2 text-right">{{ t.cumulative_hours|num }}</td>
-      <td class="px-4 py-2 text-right">{{ t.cumulative_revenue|num }}</td>
-      <td class="px-4 py-2 text-right">{{ t.jobs_cost|num }}</td>
-      <td class="px-4 py-2 text-right text-slate-500">{{ t.depreciation.accrued_rub|num }}</td>
-      <td class="px-4 py-2 text-right font-semibold {{ 'text-green-700' if t.profitability >= 0 else 'text-red-700' }}">{{ t.profitability|num }}</td>
+      <td class="px-4 py-2 text-right">{{ t.cumulative_revenue|money }}</td>
+      <td class="px-4 py-2 text-right">{{ t.jobs_cost|money }}</td>
+      <td class="px-4 py-2 text-right text-slate-500">{{ t.depreciation.accrued_rub|money }}</td>
+      <td class="px-4 py-2 text-right font-semibold {{ 'text-green-700' if t.profitability >= 0 else 'text-red-700' }}">{{ t.profitability|money }}</td>
     </tr>
     {% else %}
     <tr><td colspan="9" class="px-4 py-6 text-center text-slate-400">Инструменты пока не зарегистрированы.</td></tr>

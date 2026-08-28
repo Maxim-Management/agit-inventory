@@ -37,7 +37,7 @@
 <div class="grid md:grid-cols-2 gap-4 mb-6">
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Стоимость остатка (по партиям на складе), ₽</div>
-    <div class="text-2xl font-semibold text-blue-700">{{ part.stock_value.stock_value_rub|num }}</div>
+    <div class="text-2xl font-semibold text-blue-700">{{ part.stock_value.stock_value_rub|money }}</div>
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Курс юаня, средневзв. по остатку</div>
@@ -51,12 +51,12 @@
 <div class="bg-white border border-slate-200 rounded-xl p-5 mb-6">
   <div class="flex items-baseline justify-between mb-3">
     <h2 class="font-semibold">Стоимость за единицу</h2>
-    <div class="text-2xl font-semibold text-blue-700">{{ part.unit_cost_rub|num }} ₽</div>
+    <div class="text-2xl font-semibold text-blue-700">{{ part.unit_cost_rub|money }} ₽</div>
   </div>
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
     <div>
       <div class="text-xs text-slate-500">Себестоимость, CNY</div>
-      <div class="font-medium">{{ part.standard_cost_cny|num if part.standard_cost_cny is not none else '—' }}</div>
+      <div class="font-medium">{{ part.standard_cost_cny|money if part.standard_cost_cny is not none else '—' }}</div>
     </div>
     <div>
       <div class="text-xs text-slate-500" title="Среднее по всем поступлениям этой детали — именно оно используется в расчёте стоимости за единицу ниже">Курс юаня к рублю, средний</div>
@@ -71,7 +71,7 @@
     </div>
     <div>
       <div class="text-xs text-slate-500">Трансфер прайс, ₽</div>
-      <div class="font-medium">{{ part.unit_transfer_price_rub|num if part.unit_transfer_price_rub is not none else '—' }}</div>
+      <div class="font-medium">{{ part.unit_transfer_price_rub|money if part.unit_transfer_price_rub is not none else '—' }}</div>
     </div>
   </div>
   <p class="text-xs text-slate-400 mt-3">Стоимость за единицу = себестоимость × курс × (1 + пошлина) + трансфер прайс. Курс — средний по ВСЕМ поступлениям этой детали (простое среднее, не взвешенное по количеству); если поступлений с указанным курсом ещё не было — берётся курс из карточки детали. Себестоимость и трансфер прайс — по самому свежему поступлению этой детали (обновляются автоматически при регистрации нового поступления или правятся вручную в редактировании детали); «по самому свежему поступлению» под курсом — теперь чисто справочная величина, в самом расчёте не участвует (это меняет прежнее поведение — раньше в формуле использовался именно курс последнего поступления). Пошлина — атрибут самой позиции, одна и та же для всех партий; поступления её не меняют, править можно только в редактировании детали.</p>
@@ -87,7 +87,7 @@
       <th class="px-4 py-2">Дата изг.</th>
       <th class="px-4 py-2">Наработка, ч</th>
       <th class="px-4 py-2">Обслуж., раз</th>
-      <th class="px-4 py-2">OD/ID, мм</th>
+      <th class="px-4 py-2">Спецификация</th>
       <th class="px-4 py-2">Установлен на</th>
     </tr>
   </thead>
@@ -99,7 +99,7 @@
       <td class="px-4 py-2 text-slate-500">{{ u.date_mfg }}</td>
       <td class="px-4 py-2">{{ u.circulation_hours|num }}</td>
       <td class="px-4 py-2">{{ u.service_count }}</td>
-      <td class="px-4 py-2">{{ u.od_mm|num if u.od_mm else (u.id_mm|num if u.id_mm else '—') }}</td>
+      <td class="px-4 py-2 text-slate-500">{{ u.remarks or '—' }}</td>
       <td class="px-4 py-2 text-slate-500">{{ u.installed_on }}</td>
     </tr>
     {% else %}

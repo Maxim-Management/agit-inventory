@@ -25,7 +25,7 @@
 <div class="grid md:grid-cols-2 gap-4 mb-6">
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Остаток комплектующих на складе, ₽</div>
-    <div class="text-2xl font-semibold text-blue-700 mt-1">{{ data.stock_value_rub|num }}</div>
+    <div class="text-2xl font-semibold text-blue-700 mt-1">{{ data.stock_value_rub|money }}</div>
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Средняя наработка на инструмент, ч</div>
@@ -37,16 +37,16 @@
 <div class="grid md:grid-cols-3 gap-4 mb-6">
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Общая выручка на все инструменты, ₽</div>
-    <div class="text-2xl font-semibold text-green-700 mt-1">{{ data.total_revenue|num }}</div>
+    <div class="text-2xl font-semibold text-green-700 mt-1">{{ data.total_revenue|money }}</div>
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Общие затраты, ₽</div>
-    <div class="text-2xl font-semibold mt-1">{{ data.total_costs|num }}</div>
+    <div class="text-2xl font-semibold mt-1">{{ data.total_costs|money }}</div>
     <div class="text-xs text-slate-400 mt-0.5">по {{ data.jobs_count }} работе/работам</div>
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Результат за период, ₽</div>
-    <div class="text-2xl font-semibold mt-1 {{ 'text-green-700' if data.net_result >= 0 else 'text-red-700' }}">{{ data.net_result|num }}</div>
+    <div class="text-2xl font-semibold mt-1 {{ 'text-green-700' if data.net_result >= 0 else 'text-red-700' }}">{{ data.net_result|money }}</div>
     <div class="text-xs text-slate-400 mt-0.5">выручка − затраты</div>
   </div>
 </div>

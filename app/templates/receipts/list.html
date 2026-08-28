@@ -40,10 +40,10 @@
       <td class="px-4 py-2 text-slate-500">{{ r.date_mfg or '—' }}</td>
       <td class="px-4 py-2 text-right">{{ r.customs_duty_percent|num if r.customs_duty_percent is not none else '—' }}</td>
       <td class="px-4 py-2 text-right">{{ r.exchange_rate|num if r.exchange_rate is not none else '—' }}</td>
-      <td class="px-4 py-2 text-right">{{ r.total_cost_cny|num if r.total_cost_cny is not none else '—' }}</td>
+      <td class="px-4 py-2 text-right">{{ r.total_cost_cny|money if r.total_cost_cny is not none else '—' }}</td>
       <td class="px-4 py-2 text-right">{{ r.weight_kg|num(3) if r.weight_kg is not none else '—' }}</td>
-      <td class="px-4 py-2 text-right">{{ r.transfer_price_rub|num if r.transfer_price_rub is not none else '—' }}</td>
-      <td class="px-4 py-2 text-right font-medium">{{ r.unit_cost_rub|num }}</td>
+      <td class="px-4 py-2 text-right">{{ r.transfer_price_rub|money if r.transfer_price_rub is not none else '—' }}</td>
+      <td class="px-4 py-2 text-right font-medium">{{ r.unit_cost_rub|money }}</td>
       <td class="px-4 py-2 text-slate-500">{{ r.note }}</td>
     </tr>
     {% else %}

@@ -75,4 +75,24 @@ def create_app(test_config=None):
         int_part = int_part.replace(",", " ")
         return f"{sign}{int_part},{dec_part}"
 
+    @app.template_filter("money")
+    def fmt_money(value):
+        """Форматирует денежную сумму (₽, CNY и т.п.) — как num(), но ВСЕГДА
+        с двумя цифрами после запятой, даже для целых сумм (1000 -> "1000,00",
+        а не "1000") — так принято для сумм в денежном отображении.
+        Используйте num() для количеств/часов/процентов/курсов, где для
+        целых значений хвост из нулей не нужен и не ожидается."""
+        if value is None:
+            return "—"
+        try:
+            f = float(value)
+        except (TypeError, ValueError):
+            return value
+        sign = "-" if f < 0 else ""
+        f = abs(f)
+        grouped = f"{f:,.2f}"
+        int_part, _, dec_part = grouped.partition(".")
+        int_part = int_part.replace(",", " ")
+        return f"{sign}{int_part},{dec_part}"
+
     return app

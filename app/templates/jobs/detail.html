@@ -16,23 +16,23 @@
 <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Детали</div>
-    <div class="text-xl font-semibold mt-1">{{ job.parts_cost|num }} ₽</div>
+    <div class="text-xl font-semibold mt-1">{{ job.parts_cost|money }} ₽</div>
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Стоимость сервисного центра</div>
-    <div class="text-xl font-semibold mt-1">{{ job.service_center_cost|num }} ₽</div>
+    <div class="text-xl font-semibold mt-1">{{ job.service_center_cost|money }} ₽</div>
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Персонал</div>
-    <div class="text-xl font-semibold mt-1">{{ job.labor_cost|num }} ₽</div>
+    <div class="text-xl font-semibold mt-1">{{ job.labor_cost|money }} ₽</div>
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Прочее</div>
-    <div class="text-xl font-semibold mt-1">{{ job.other_cost|num }} ₽</div>
+    <div class="text-xl font-semibold mt-1">{{ job.other_cost|money }} ₽</div>
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Итого</div>
-    <div class="text-xl font-semibold mt-1 text-blue-700">{{ job.total_cost|num }} ₽</div>
+    <div class="text-xl font-semibold mt-1 text-blue-700">{{ job.total_cost|money }} ₽</div>
   </div>
 </div>
 
@@ -53,7 +53,7 @@
           <td class="py-1">{{ w.part_name }}</td>
           <td class="py-1 text-slate-500">{{ w.serial_number if w.serial_number else (w.quantity|num) + ' шт' }}</td>
           <td class="py-1">{{ reason_labels.get(w.reason, w.reason) }}</td>
-          <td class="py-1 text-right">{{ w.line_cost_rub|num }}</td>
+          <td class="py-1 text-right">{{ w.line_cost_rub|money }}</td>
         </tr>
         {% endfor %}
       </tbody>
@@ -116,6 +116,22 @@
           <button class="bg-slate-900 text-white rounded-lg px-3 py-1.5 text-sm hover:bg-slate-800">Списать</button>
         </form>
 
+        <div id="installed_conflict" class="hidden mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm">
+          <p class="text-orange-800 mb-2">На инструменте уже установлен компонент этого типа — <span id="installed_conflict_serial" class="font-medium"></span>. Что с ним сделать?</p>
+          <form id="installed_conflict_writeoff_form" method="post" action="{{ url_for('jobs.consume_unit', job_id=job.id) }}" class="flex flex-wrap items-center gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="write_off_date" value="{{ job.job_date }}">
+            <input type="hidden" name="unit_id" id="installed_conflict_unit_id">
+            <select name="reason" class="border border-slate-300 rounded-lg px-2 py-1.5 text-sm">
+              {% for k, v in reason_labels.items() %}
+              <option value="{{ k }}" {{ 'selected' if k=='repair' }}>{{ v }}</option>
+              {% endfor %}
+            </select>
+            <button class="bg-slate-900 text-white rounded-lg px-3 py-1.5 text-sm hover:bg-slate-800">Списать</button>
+            <button type="button" id="installed_conflict_transfer_btn" class="bg-white border border-slate-300 text-slate-700 rounded-lg px-3 py-1.5 text-sm hover:bg-slate-50">Убрать на склад</button>
+          </form>
+        </div>
+
         <form id="transfer_write_off_form" method="post" action="{{ url_for('jobs.transfer_unit', job_id=job.id) }}" class="hidden">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="unit_id" id="transfer_unit_id">
@@ -158,6 +174,10 @@
         const modal = document.getElementById('serial_modal');
         const modalList = document.getElementById('serial_modal_list');
         const modalSearch = document.getElementById('serial_modal_search');
+        const installedConflict = document.getElementById('installed_conflict');
+        const installedConflictSerial = document.getElementById('installed_conflict_serial');
+        const installedConflictUnitIdInput = document.getElementById('installed_conflict_unit_id');
+        const installedConflictTransferBtn = document.getElementById('installed_conflict_transfer_btn');
 
         function refreshBulkBatches() {
           const batches = batchesByPart[bulkPartInput.value] || [];
@@ -230,7 +250,21 @@
           serialUnitIdInput.value = u.id;
           selectedSerialLabel.textContent = u.serial_number + (u.status === 'installed' ? ' (установлен)' : '');
           serialForm.classList.remove('hidden');
+          checkInstalledConflict(u);
           closeModal();
+        }
+
+        function checkInstalledConflict(selected) {
+          installedConflict.classList.add('hidden');
+          installedConflictUnitIdInput.value = '';
+          if (!selected || selected.status === 'installed') return;
+          const units = unitsByPart[partSelect.value] || [];
+          const installedUnit = units.find(u => u.status === 'installed' && u.id !== selected.id);
+          if (installedUnit) {
+            installedConflictSerial.textContent = installedUnit.serial_number;
+            installedConflictUnitIdInput.value = installedUnit.id;
+            installedConflict.classList.remove('hidden');
+          }
         }
 
         function openModal() {
@@ -254,6 +288,8 @@
           serialForm.classList.add('hidden');
           serialUnitIdInput.value = '';
           selectedSerialLabel.textContent = '';
+          installedConflict.classList.add('hidden');
+          installedConflictUnitIdInput.value = '';
           if (hasPart && !serialized) {
             bulkPartInput.value = partSelect.value;
             refreshBulkBatches();
@@ -265,6 +301,14 @@
         closeModalBtn.addEventListener('click', closeModal);
         modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
         modalSearch.addEventListener('input', renderModalList);
+        installedConflictTransferBtn.addEventListener('click', () => {
+          const id = installedConflictUnitIdInput.value;
+          if (!id) return;
+          if (confirm('Снять установленный компонент с инструмента и вернуть на склад без списания?')) {
+            transferUnitIdInput.value = id;
+            transferForm.submit();
+          }
+        });
       })();
     </script>
     {% endif %}
