@@ -28,7 +28,10 @@
             <a href="{{ url_for('receipts.list_receipts') }}" class="hover:text-white">Поступления</a>
             <a href="{{ url_for('writeoffs.list_writeoffs') }}" class="hover:text-white">Списания</a>
             <a href="{{ url_for('jobs.list_view') }}" class="hover:text-white">Сервис</a>
+            <a href="{{ url_for('customers.list_view') }}" class="hover:text-white">Заказчики</a>
+            <a href="{{ url_for('pairing.index') }}" class="hover:text-white">Подбор пар</a>
             <a href="{{ url_for('analytics.index') }}" class="hover:text-white">Аналитика</a>
+            <a href="{{ url_for('forecast.index') }}" class="hover:text-white">Прогноз</a>
             {% if current_user.role == 'admin' %}
             <a href="{{ url_for('admin.users') }}" class="hover:text-white">Пользователи</a>
             {% endif %}

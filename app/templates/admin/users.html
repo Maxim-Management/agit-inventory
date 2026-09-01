@@ -40,4 +40,18 @@
   </tbody>
 </table>
 </div>
+
+<div class="mt-8 bg-white border border-slate-200 rounded-xl p-5">
+  <h2 class="text-lg font-semibold mb-1">Экспорт данных</h2>
+  <p class="text-sm text-slate-500 mb-3">
+    Выгружает вообще все данные приложения (комплектующие, поступления, серийные единицы,
+    инструменты, ремонтные работы, списания, наработку, заказчиков, ставки, выручку, подобранные
+    пары) в один JSON-файл — например, для переноса в локальную копию Mac-приложения (см. в архиве
+    приложения README.md, раздел «Перенос данных с сайта»).
+  </p>
+  <a href="{{ url_for('admin.export_json') }}"
+     class="inline-block bg-slate-900 text-white text-sm px-4 py-2 rounded-lg hover:bg-slate-800">
+    Скачать agit_export.json
+  </a>
+</div>
 {% endblock %}
