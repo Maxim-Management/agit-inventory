@@ -7,7 +7,7 @@ from . import db
 from .auth import login_required
 from .analytics import (
     repair_usage_by_period, ops_report, stock_report_rows, tool_hours_report_rows,
-    component_hours_report_rows, revenue_report_rows,
+    component_hours_report_rows, revenue_report_rows, revenue_by_month_rows, revenue_by_tool_rows,
 )
 from .jobs import list_jobs, JOB_TYPE_LABELS
 from .customers import WORK_RATE_UNIT_LABELS
@@ -42,7 +42,16 @@ def report():
     date_from = request.args.get("date_from") or None
     date_to = request.args.get("date_to") or None
     data = ops_report(date_from=date_from, date_to=date_to)
-    return render_template("analytics/report.html", data=data, date_from=date_from, date_to=date_to)
+    stock_rows = stock_report_rows()
+    tool_hours_rows = tool_hours_report_rows()
+    component_hours_rows = component_hours_report_rows()
+    revenue_month_rows = revenue_by_month_rows(date_from, date_to)
+    revenue_tool_rows = revenue_by_tool_rows(date_from, date_to)
+    return render_template(
+        "analytics/report.html", data=data, date_from=date_from, date_to=date_to,
+        stock_rows=stock_rows, tool_hours_rows=tool_hours_rows, component_hours_rows=component_hours_rows,
+        revenue_month_rows=revenue_month_rows, revenue_tool_rows=revenue_tool_rows,
+    )
 
 
 @bp.route("/report/export.csv")
@@ -54,6 +63,8 @@ def export_report_csv():
     include_tool_hours = request.args.get("include_tool_hours") == "1"
     include_component_hours = request.args.get("include_component_hours") == "1"
     include_revenue = request.args.get("include_revenue") == "1"
+    include_revenue_by_month = request.args.get("include_revenue_by_month") == "1"
+    include_revenue_by_tool = request.args.get("include_revenue_by_tool") == "1"
     include_costs = request.args.get("include_costs") == "1"
 
     period_suffix = ""
@@ -99,6 +110,22 @@ def export_report_csv():
                 WORK_RATE_UNIT_LABELS.get(r["work_unit"], "") if r["work_qty"] is not None else "",
                 r["standby_days"] if r["standby_days"] is not None else "", r["amount"],
             ])
+        writer.writerow([])
+        wrote_any = True
+
+    if include_revenue_by_month:
+        writer.writerow([f"Выручка по месяцам{period_suffix}"])
+        writer.writerow(["Месяц", "Сумма, RUB"])
+        for row in revenue_by_month_rows(date_from, date_to):
+            writer.writerow([row["month"], row["amount"]])
+        writer.writerow([])
+        wrote_any = True
+
+    if include_revenue_by_tool:
+        writer.writerow([f"Выручка по инструментам (сводно){period_suffix}"])
+        writer.writerow(["Серийный №", "Типоразмер", "Сумма, RUB"])
+        for row in revenue_by_tool_rows(date_from, date_to):
+            writer.writerow([row["serial_number"], row["tool_size"], row["amount"]])
         writer.writerow([])
         wrote_any = True
 

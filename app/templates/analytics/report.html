@@ -51,7 +51,7 @@
   </div>
 </div>
 
-<div class="bg-white border border-slate-200 rounded-xl p-5">
+<div class="bg-white border border-slate-200 rounded-xl p-5 mb-6">
   <h2 class="font-semibold mb-1">Выгрузка отчёта в CSV</h2>
   <p class="text-xs text-slate-400 mb-3">Отметьте, что выгрузить — можно любое сочетание, всё соберётся в один файл. Даты «с»/«по» применяются к выручке и затратам (как заполнено выше); остатки и наработка выгружаются всегда на текущий момент.</p>
   <form method="get" action="{{ url_for('analytics.export_report_csv') }}" class="flex flex-wrap items-center gap-x-6 gap-y-3">
@@ -60,9 +60,109 @@
     <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="include_stock" value="1" checked class="rounded"> Остатки на складе (по деталям)</label>
     <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="include_tool_hours" value="1" checked class="rounded"> Наработка по инструментам</label>
     <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="include_component_hours" value="1" checked class="rounded"> Наработка по компонентам</label>
-    <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="include_revenue" value="1" checked class="rounded"> Выручка по инструментам</label>
+    <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="include_revenue" value="1" checked class="rounded"> Выручка по инструментам (по записям)</label>
+    <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="include_revenue_by_month" value="1" checked class="rounded"> Выручка по месяцам</label>
+    <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="include_revenue_by_tool" value="1" checked class="rounded"> Выручка по инструментам (сводно)</label>
     <label class="flex items-center gap-1.5 text-sm"><input type="checkbox" name="include_costs" value="1" checked class="rounded"> Затраты по работам</label>
     <button class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm">Скачать CSV</button>
   </form>
+</div>
+
+<div class="space-y-4">
+  <details class="bg-white border border-slate-200 rounded-xl p-5" open>
+    <summary class="font-semibold cursor-pointer">Остатки на складе</summary>
+    <div class="overflow-x-auto mt-3">
+    <table class="w-full text-sm">
+      <thead class="text-slate-500 text-left"><tr><th class="py-1 pr-3">Типоразмер</th><th class="py-1 pr-3">Наименование</th><th class="py-1 pr-3">Номенкл. №</th><th class="py-1 pr-3 text-right">Остаток</th><th class="py-1 text-right">Стоимость, ₽</th></tr></thead>
+      <tbody>
+        {% for row in stock_rows %}
+        <tr class="border-t border-slate-100">
+          <td class="py-1 pr-3">{{ row.tool_size }}</td>
+          <td class="py-1 pr-3">{{ row.part_name }}</td>
+          <td class="py-1 pr-3 text-slate-500">{{ row.part_number }}</td>
+          <td class="py-1 pr-3 text-right">{{ row.current_stock|num }}</td>
+          <td class="py-1 text-right">{{ row.stock_value_rub|money }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="py-3 text-center text-slate-400">Деталей в справочнике пока нет.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
+
+  <details class="bg-white border border-slate-200 rounded-xl p-5">
+    <summary class="font-semibold cursor-pointer">Наработка по инструментам</summary>
+    <table class="w-full text-sm mt-3">
+      <thead class="text-slate-500 text-left"><tr><th class="py-1">Серийный №</th><th class="py-1">Типоразмер</th><th class="py-1 text-right">Наработка, ч</th></tr></thead>
+      <tbody>
+        {% for row in tool_hours_rows %}
+        <tr class="border-t border-slate-100">
+          <td class="py-1">{{ row.serial_number }}</td>
+          <td class="py-1">{{ row.tool_size }}</td>
+          <td class="py-1 text-right">{{ row.hours|num }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="py-3 text-center text-slate-400">Инструментов пока нет.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+
+  <details class="bg-white border border-slate-200 rounded-xl p-5">
+    <summary class="font-semibold cursor-pointer">Наработка по компонентам</summary>
+    <div class="overflow-x-auto mt-3">
+    <table class="w-full text-sm">
+      <thead class="text-slate-500 text-left"><tr><th class="py-1 pr-3">Серийный №</th><th class="py-1 pr-3">Деталь</th><th class="py-1 pr-3">Номенкл. №</th><th class="py-1 text-right">Наработка, ч</th></tr></thead>
+      <tbody>
+        {% for row in component_hours_rows %}
+        <tr class="border-t border-slate-100">
+          <td class="py-1 pr-3">{{ row.serial_number }}</td>
+          <td class="py-1 pr-3">{{ row.part_name }}</td>
+          <td class="py-1 pr-3 text-slate-500">{{ row.part_number }}</td>
+          <td class="py-1 text-right">{{ row.hours|num }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="py-3 text-center text-slate-400">Серийных компонентов пока нет.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </details>
+
+  <details class="bg-white border border-slate-200 rounded-xl p-5">
+    <summary class="font-semibold cursor-pointer">Выручка по месяцам{% if date_from or date_to %} ({{ date_from or '…' }} — {{ date_to or '…' }}){% endif %}</summary>
+    <table class="w-full text-sm mt-3">
+      <thead class="text-slate-500 text-left"><tr><th class="py-1">Месяц</th><th class="py-1 text-right">Сумма, ₽</th></tr></thead>
+      <tbody>
+        {% for row in revenue_month_rows %}
+        <tr class="border-t border-slate-100">
+          <td class="py-1">{{ row.month }}</td>
+          <td class="py-1 text-right">{{ row.amount|money }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="2" class="py-3 text-center text-slate-400">Выручки за выбранный период нет.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+
+  <details class="bg-white border border-slate-200 rounded-xl p-5">
+    <summary class="font-semibold cursor-pointer">Выручка по инструментам{% if date_from or date_to %} ({{ date_from or '…' }} — {{ date_to or '…' }}){% endif %}</summary>
+    <table class="w-full text-sm mt-3">
+      <thead class="text-slate-500 text-left"><tr><th class="py-1">Серийный №</th><th class="py-1">Типоразмер</th><th class="py-1 text-right">Сумма, ₽</th></tr></thead>
+      <tbody>
+        {% for row in revenue_tool_rows %}
+        <tr class="border-t border-slate-100">
+          <td class="py-1"><a href="{{ url_for('tools.detail', tool_id=row.tool_id) }}" class="text-blue-700 hover:underline">{{ row.serial_number }}</a></td>
+          <td class="py-1">{{ row.tool_size }}</td>
+          <td class="py-1 text-right">{{ row.amount|money }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="py-3 text-center text-slate-400">Инструментов пока нет.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
 </div>
 {% endblock %}

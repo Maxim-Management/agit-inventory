@@ -10,6 +10,7 @@
   <div class="flex items-center gap-2">
     <span class="px-3 py-1 rounded text-sm status-{{ unit.status }}">{{ unit.status }}</span>
     {% if can_edit and unit.status != 'written_off' %}
+    <a href="{{ url_for('units.repair', unit_id=unit.id) }}" class="bg-slate-100 border border-slate-300 text-slate-700 text-sm px-4 py-2 rounded-lg hover:bg-slate-200">Ремонт</a>
     <a href="{{ url_for('units.writeoff', unit_id=unit.id) }}" class="bg-red-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-red-700">Списать</a>
     {% endif %}
   </div>
@@ -111,6 +112,37 @@
     </table>
     {% else %}
     <p class="text-sm text-slate-400">Компонент не списывался.</p>
+    {% endif %}
+
+    <h2 class="font-semibold mb-3 mt-6">История ремонтов</h2>
+    {% if repairs %}
+    <table class="w-full text-sm">
+      <thead class="text-slate-500 text-left"><tr><th class="py-1">Дата</th><th class="py-1 text-right">Стоимость, ₽</th><th class="py-1">Работа</th>{% if is_admin %}<th class="py-1"></th>{% endif %}</tr></thead>
+      <tbody>
+        {% for r in repairs %}
+        <tr class="border-t border-slate-100">
+          <td class="py-1">{{ r.repair_date }}</td>
+          <td class="py-1 text-right">{{ r.cost_rub|money }}</td>
+          <td class="py-1 text-slate-500">
+            {% if r.job_id %}<a href="{{ url_for('jobs.detail', job_id=r.job_id) }}" class="text-blue-700 hover:underline">{{ r.job_title or r.job_job_date }}</a>{% else %}— (не отнесено на работу){% endif %}
+          </td>
+          {% if is_admin %}
+          <td class="py-1 text-right whitespace-nowrap">
+            <form method="post" action="{{ url_for('units.delete_repair', unit_id=unit.id, repair_id=r.id) }}" onsubmit="return confirm('Удалить эту запись о ремонте?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="text-red-700 hover:underline text-xs">✕</button>
+            </form>
+          </td>
+          {% endif %}
+        </tr>
+        {% if r.note %}
+        <tr><td colspan="{{ 4 if is_admin else 3 }}" class="pb-1 text-xs text-slate-400">{{ r.note }}</td></tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-sm text-slate-400">Компонент ещё не ремонтировался.</p>
     {% endif %}
 
     <h2 class="font-semibold mb-3 mt-6">Примечания</h2>

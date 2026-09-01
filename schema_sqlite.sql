@@ -197,6 +197,19 @@ CREATE TABLE IF NOT EXISTS tool_usage_logs (
 );
 CREATE INDEX IF NOT EXISTS idx_toolusagelogs_tool ON tool_usage_logs(tool_id);
 
+CREATE TABLE IF NOT EXISTS unit_repairs (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    unit_id      INTEGER NOT NULL REFERENCES units(id) ON DELETE CASCADE,
+    job_id       INTEGER REFERENCES service_jobs(id) ON DELETE SET NULL,
+    repair_date  DATE NOT NULL,
+    cost_rub     NUMERIC NOT NULL DEFAULT 0,
+    note         TEXT NOT NULL DEFAULT '',
+    created_by   INTEGER REFERENCES users(id),
+    created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_unitrepairs_unit ON unit_repairs(unit_id);
+CREATE INDEX IF NOT EXISTS idx_unitrepairs_job ON unit_repairs(job_id);
+
 CREATE TABLE IF NOT EXISTS customers (
     id                     INTEGER PRIMARY KEY AUTOINCREMENT,
     name                   TEXT NOT NULL,

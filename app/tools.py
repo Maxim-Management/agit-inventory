@@ -16,7 +16,7 @@
 from datetime import date
 
 from . import db
-from .jobs import job_totals
+from .jobs import job_totals, delete_job as _delete_job
 
 STATUS_LABELS = {"active": "В работе", "in_repair": "В ремонте", "retired": "Списан"}
 
@@ -380,6 +380,35 @@ def tool_revenue_history(tool_id):
            WHERE tr.tool_id = %s ORDER BY tr.revenue_date DESC, tr.id DESC""",
         [tool_id],
     )
+
+
+def delete_tool(tool_id):
+    """Удаляет инструмент целиком со всей связанной историей:
+      - выручка (tool_revenue) — через delete_tool_revenue(), с откатом
+        любой наработки, перенесённой ею;
+      - наработка инструмента (tool_usage_logs) — через delete_tool_usage(),
+        с откатом наработки, зеркально прибавленной установленным на тот
+        момент компонентам;
+      - ремонтные/сборочные работы (service_jobs) — через jobs.delete_job(),
+        с возвратом списанных на них компонентов на склад; записи о ремонте
+        серийных компонентов (unit_repairs), отнесённые на эти работы,
+        сохраняются, только отвязываются от удаляемой работы;
+      - компоненты, установленные на инструменте сейчас, — снимаются и
+        возвращаются на склад (без списания).
+    Необратимо — используется только администратором, требует явного
+    подтверждения в интерфейсе (см. app/templates/tools/detail.html)."""
+    for r in db.query_all("SELECT id FROM tool_revenue WHERE tool_id = %s", [tool_id]):
+        delete_tool_revenue(tool_id, r["id"])
+    for l in db.query_all("SELECT id FROM tool_usage_logs WHERE tool_id = %s", [tool_id]):
+        try:
+            delete_tool_usage(tool_id, l["id"])
+        except ValueError:
+            pass
+    for u in db.query_all("SELECT id FROM units WHERE installed_on_tool_id = %s", [tool_id]):
+        remove_unit(u["id"])
+    for j in db.query_all("SELECT id FROM service_jobs WHERE tool_id = %s", [tool_id]):
+        _delete_job(j["id"])
+    db.execute("DELETE FROM tools WHERE id = %s", [tool_id])
 
 
 def tool_jobs(tool_id):

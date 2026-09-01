@@ -39,7 +39,8 @@
     <tr>
       <th class="px-4 py-2">Дата</th><th class="px-4 py-2">Тип</th><th class="px-4 py-2">Наряд-заказ №</th>
       <th class="px-4 py-2">Инструмент</th><th class="px-4 py-2">Название</th>
-      <th class="px-4 py-2 text-right">Детали, ₽</th><th class="px-4 py-2 text-right">Сервис, ₽</th>
+      <th class="px-4 py-2 text-right">Детали, ₽</th><th class="px-4 py-2 text-right">Ремонт компонентов, ₽</th>
+      <th class="px-4 py-2 text-right">Сервис, ₽</th>
       <th class="px-4 py-2 text-right">Персонал, ₽</th><th class="px-4 py-2 text-right">Прочее, ₽</th>
       <th class="px-4 py-2 text-right font-semibold">Итого, ₽</th>
     </tr>
@@ -53,13 +54,14 @@
       <td class="px-4 py-2 text-slate-500">{% if j.tool_serial %}<a href="{{ url_for('tools.detail', tool_id=j.tool_id) }}" class="text-blue-700 hover:underline">{{ j.tool_serial }}</a>{% else %}—{% endif %}</td>
       <td class="px-4 py-2 text-slate-500">{{ j.title or '—' }}</td>
       <td class="px-4 py-2 text-right">{{ j.parts_cost|money }}</td>
+      <td class="px-4 py-2 text-right">{{ j.component_repairs_cost|money }}</td>
       <td class="px-4 py-2 text-right">{{ j.service_center_cost|money }}</td>
       <td class="px-4 py-2 text-right">{{ j.labor_cost|money }}</td>
       <td class="px-4 py-2 text-right">{{ j.other_cost|money }}</td>
       <td class="px-4 py-2 text-right font-semibold">{{ j.total_cost|money }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="10" class="px-4 py-6 text-center text-slate-400">Работ пока нет.</td></tr>
+    <tr><td colspan="11" class="px-4 py-6 text-center text-slate-400">Работ пока нет.</td></tr>
     {% endfor %}
   </tbody>
 </table>

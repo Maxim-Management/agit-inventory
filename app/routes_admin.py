@@ -135,6 +135,9 @@ def export_json():
         "pairings": db.query_all(
             "SELECT id, rotor_unit_id, stator_unit_id, gap_mm, status, created_at FROM pairings ORDER BY id"
         ),
+        "unit_repairs": db.query_all(
+            "SELECT id, unit_id, job_id, repair_date, cost_rub, note, created_at FROM unit_repairs ORDER BY id"
+        ),
     }
     body = json.dumps(data, default=_json_default, ensure_ascii=False)
     return Response(

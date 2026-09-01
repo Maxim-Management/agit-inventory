@@ -3,6 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from . import db
 from .auth import login_required, roles_required
 from .stock import consume_from_batch
+from . import tools as tools_mod
 
 bp = Blueprint("units", __name__, url_prefix="/units")
 
@@ -97,6 +98,13 @@ def detail(unit_id):
     if unit.get("installed_on_tool_id"):
         installed_on_tool = db.query_one("SELECT * FROM tools WHERE id = %s", [unit["installed_on_tool_id"]])
 
+    repairs = db.query_all(
+        """SELECT ur.*, sj.title AS job_title, sj.job_date AS job_job_date
+           FROM unit_repairs ur LEFT JOIN service_jobs sj ON sj.id = ur.job_id
+           WHERE ur.unit_id = %s ORDER BY ur.repair_date DESC, ur.id DESC""",
+        [unit_id],
+    )
+
     # накопительная наработка по датам — для графика
     cumulative = []
     total_hours = 0.0
@@ -107,6 +115,7 @@ def detail(unit_id):
     return render_template(
         "units/detail.html", unit=unit, usage_logs=usage_logs, write_offs=write_offs,
         paired_with=paired_with, cumulative=cumulative, installed_on_tool=installed_on_tool,
+        repairs=repairs,
     )
 
 
@@ -216,3 +225,59 @@ def writeoff(unit_id):
         "SELECT id, job_date, job_type, title, tool_assembly FROM service_jobs ORDER BY job_date DESC, id DESC LIMIT 20"
     )
     return render_template("units/writeoff.html", unit=unit, recent_jobs=recent_jobs)
+
+
+@bp.route("/<int:unit_id>/repair", methods=("GET", "POST"))
+@roles_required("admin", "engineer")
+def repair(unit_id):
+    """Запись о ремонте серийного компонента (например, перемотка/переточка
+    ротора или статора у стороннего подрядчика) с указанием стоимости.
+    Если запись сразу привязывается к ремонтной/сборочной работе (job_id) —
+    её стоимость ложится в стоимость этой работы (см. app/jobs.py:
+    job_totals(), поле component_repairs_cost), а сам компонент в этот
+    момент устанавливается на инструмент этой работы (как и предполагается
+    смыслом «отремонтировали и поставили обратно в рамках этого ремонта»).
+    Без привязки к работе — просто фиксирует факт и стоимость ремонта в
+    истории компонента, ни на что не влияя, пока не будет позже привязана
+    к работе (см. ниже про повторный вызов этой же формы)."""
+    unit = db.query_one(
+        """SELECT u.*, p.part_name, p.part_number FROM units u JOIN parts p ON p.id=u.part_id WHERE u.id=%s""",
+        [unit_id],
+    )
+    if not unit:
+        flash("Компонент не найден.", "error")
+        return redirect(url_for("units.list_units"))
+
+    if request.method == "POST":
+        f = request.form
+        cost = float(f.get("cost_rub") or 0)
+        if cost <= 0:
+            flash("Стоимость ремонта должна быть больше нуля.", "error")
+            return redirect(url_for("units.repair", unit_id=unit_id))
+        job_id = f.get("job_id") or None
+        db.execute(
+            """INSERT INTO unit_repairs (unit_id, job_id, repair_date, cost_rub, note, created_by)
+               VALUES (%s,%s,%s,%s,%s,%s)""",
+            [unit_id, job_id, f["repair_date"], cost, f.get("note", ""), g.user["id"]],
+        )
+        msg = f"Ремонт компонента {unit['serial_number']} записан ({cost:g} ₽)."
+        if job_id:
+            job = db.query_one("SELECT * FROM service_jobs WHERE id = %s", [job_id])
+            if job and job.get("tool_id"):
+                tools_mod.install_unit(unit_id, job["tool_id"])
+                msg += " Компонент установлен на инструмент этой работы, стоимость ремонта включена в стоимость работы."
+        flash(msg, "ok")
+        return redirect(url_for("units.detail", unit_id=unit_id))
+
+    recent_jobs = db.query_all(
+        "SELECT id, job_date, job_type, title, tool_assembly FROM service_jobs ORDER BY job_date DESC, id DESC LIMIT 20"
+    )
+    return render_template("units/repair.html", unit=unit, recent_jobs=recent_jobs)
+
+
+@bp.route("/<int:unit_id>/repair/<int:repair_id>/delete", methods=("POST",))
+@roles_required("admin")
+def delete_repair(unit_id, repair_id):
+    db.execute("DELETE FROM unit_repairs WHERE id = %s AND unit_id = %s", [repair_id, unit_id])
+    flash("Запись о ремонте удалена.", "ok")
+    return redirect(url_for("units.detail", unit_id=unit_id))

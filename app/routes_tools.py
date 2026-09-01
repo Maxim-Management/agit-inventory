@@ -115,6 +115,19 @@ def edit_tool(tool_id):
     return render_template("tools/edit.html", tool=tool, status_labels=STATUS_LABELS)
 
 
+@bp.route("/<int:tool_id>/delete", methods=("POST",))
+@roles_required("admin")
+def delete_tool(tool_id):
+    tool = tools_mod.get_tool(tool_id)
+    if not tool:
+        flash("Инструмент не найден.", "error")
+        return redirect(url_for("tools.list_view"))
+    serial = tool["serial_number"]
+    tools_mod.delete_tool(tool_id)
+    flash(f"Инструмент {serial} и вся связанная история (выручка, наработка, работы) удалены.", "ok")
+    return redirect(url_for("tools.list_view"))
+
+
 @bp.route("/<int:tool_id>/install", methods=("POST",))
 @roles_required("admin", "engineer")
 def install(tool_id):

@@ -13,10 +13,14 @@
   {% if job.service_center %}{% if job.work_order_number or job.performed_by %} · {% endif %}сервисный центр: {{ job.service_center }}{% endif %}
 </p>
 
-<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+<div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Детали</div>
     <div class="text-xl font-semibold mt-1">{{ job.parts_cost|money }} ₽</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Ремонт компонентов</div>
+    <div class="text-xl font-semibold mt-1">{{ job.component_repairs_cost|money }} ₽</div>
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Стоимость сервисного центра</div>
@@ -373,5 +377,27 @@
     <p class="text-sm text-slate-600">{{ job.note or '—' }}</p>
     {% endif %}
   </div>
+</div>
+
+<div class="bg-white border border-slate-200 rounded-xl p-5">
+  <h2 class="font-semibold mb-3">Ремонт серийных компонентов по этой работе</h2>
+  {% if component_repairs %}
+  <table class="w-full text-sm">
+    <thead class="text-slate-500 text-left"><tr><th class="py-1">Дата</th><th class="py-1">Компонент</th><th class="py-1">Комментарий</th><th class="py-1 text-right">Стоимость, ₽</th></tr></thead>
+    <tbody>
+      {% for r in component_repairs %}
+      <tr class="border-t border-slate-100">
+        <td class="py-1">{{ r.repair_date }}</td>
+        <td class="py-1"><a href="{{ url_for('units.detail', unit_id=r.unit_id) }}" class="text-blue-700 hover:underline">{{ r.serial_number }}</a> <span class="text-slate-500">({{ r.part_name }})</span></td>
+        <td class="py-1 text-slate-500">{{ r.note }}</td>
+        <td class="py-1 text-right">{{ r.cost_rub|money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="text-sm text-slate-400">Ремонт компонентов на эту работу пока не отнесён.</p>
+  {% endif %}
+  <p class="text-xs text-slate-400 mt-3">Чтобы записать ремонт серийного компонента и отнести его стоимость на эту работу, откройте карточку нужного компонента (Комплектующие → серийная единица, или список установленных компонентов на карточке инструмента) и используйте там кнопку «Ремонт» — там же можно выбрать эту работу.</p>
 </div>
 {% endblock %}

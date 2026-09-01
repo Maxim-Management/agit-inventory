@@ -235,6 +235,52 @@ def component_hours_report_rows():
               "hours": float(r["circulation_hours"] or 0)} for r in rows]
 
 
+def revenue_by_month_rows(date_from=None, date_to=None):
+    """Выручка, сгруппированная по месяцам (YYYY-MM) — для отчёта в
+    «Аналитике» (экран + CSV-выгрузка)."""
+    sql = "SELECT revenue_date, amount FROM tool_revenue WHERE 1=1"
+    params = []
+    if date_from:
+        sql += " AND revenue_date >= %s"
+        params.append(date_from)
+    if date_to:
+        sql += " AND revenue_date <= %s"
+        params.append(date_to)
+    rows = db.query_all(sql, params)
+    by_month = defaultdict(float)
+    for r in rows:
+        d = _parse_date(r["revenue_date"])
+        if d is None:
+            continue
+        by_month[f"{d.year}-{d.month:02d}"] += float(r["amount"] or 0)
+    return [{"month": m, "amount": round(a, 2)} for m, a in sorted(by_month.items())]
+
+
+def revenue_by_tool_rows(date_from=None, date_to=None):
+    """Выручка, сгруппированная по инструментам (за период, если задан) —
+    для отчёта в «Аналитике» (экран + CSV-выгрузка). Инструменты без
+    выручки за период тоже показываются (0 ₽), кроме случая, когда у
+    инструмента вообще нет ни одной записи выручки в выбранном периоде И
+    есть записи вне его — тогда он не попадёт в выборку (обычное поведение
+    фильтра по датам с LEFT JOIN + агрегатом)."""
+    sql = """SELECT t.id, t.serial_number, t.tool_size, COALESCE(SUM(tr.amount), 0) AS total
+             FROM tools t LEFT JOIN tool_revenue tr ON tr.tool_id = t.id"""
+    conds = []
+    params = []
+    if date_from:
+        conds.append("(tr.revenue_date IS NULL OR tr.revenue_date >= %s)")
+        params.append(date_from)
+    if date_to:
+        conds.append("(tr.revenue_date IS NULL OR tr.revenue_date <= %s)")
+        params.append(date_to)
+    if conds:
+        sql += " WHERE " + " AND ".join(conds)
+    sql += " GROUP BY t.id, t.serial_number, t.tool_size ORDER BY total DESC, t.serial_number"
+    rows = db.query_all(sql, params)
+    return [{"tool_id": r["id"], "serial_number": r["serial_number"], "tool_size": r["tool_size"],
+              "amount": round(float(r["total"] or 0), 2)} for r in rows]
+
+
 def revenue_report_rows(date_from=None, date_to=None):
     """Строки выручки (по инструментам) за период — для выгрузки в сводном отчёте."""
     sql = """SELECT tr.revenue_date, t.serial_number AS tool_serial, c.name AS customer_name,

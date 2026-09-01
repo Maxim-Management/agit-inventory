@@ -18,7 +18,7 @@
   <button class="bg-slate-100 border border-slate-300 rounded-lg px-4 py-2 text-sm">Применить</button>
 </form>
 
-<div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+<div class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Работ</div>
     <div class="text-2xl font-semibold mt-1">{{ totals.jobs_count }}</div>
@@ -26,6 +26,10 @@
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Детали</div>
     <div class="text-2xl font-semibold mt-1">{{ totals.parts_cost|money }} ₽</div>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <div class="text-xs text-slate-500">Ремонт компонентов</div>
+    <div class="text-2xl font-semibold mt-1">{{ totals.component_repairs_cost|money }} ₽</div>
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-4">
     <div class="text-xs text-slate-500">Сервисный центр</div>

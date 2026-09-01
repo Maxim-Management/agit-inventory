@@ -245,6 +245,27 @@ ALTER TABLE usage_logs
     FOREIGN KEY (source_tool_usage_log_id) REFERENCES tool_usage_logs(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_usagelogs_source_tool_log ON usage_logs(source_tool_usage_log_id);
 
+-- Ремонт серийного компонента (units) как отдельного узла — например,
+-- перемотка/переточка ротора или статора у стороннего подрядчика.
+-- job_id опционален: запись можно создать сама по себе (просто зафиксировать
+-- факт и стоимость ремонта), а можно сразу привязать к ремонтной/сборочной
+-- работе (service_jobs) — тогда её стоимость (cost_rub) учитывается в
+-- стоимости этой работы (см. app/jobs.py: job_totals()), то есть "ложится в
+-- стоимость ремонта инструмента", и сам компонент в этот момент
+-- устанавливается на инструмент этой работы (см. app/routes_units.py: repair()).
+CREATE TABLE IF NOT EXISTS unit_repairs (
+    id           SERIAL PRIMARY KEY,
+    unit_id      INTEGER NOT NULL REFERENCES units(id) ON DELETE CASCADE,
+    job_id       INTEGER REFERENCES service_jobs(id) ON DELETE SET NULL,
+    repair_date  DATE NOT NULL,
+    cost_rub     NUMERIC NOT NULL DEFAULT 0,
+    note         TEXT NOT NULL DEFAULT '',
+    created_by   INTEGER REFERENCES users(id),
+    created_at   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_unitrepairs_unit ON unit_repairs(unit_id);
+CREATE INDEX IF NOT EXISTS idx_unitrepairs_job ON unit_repairs(job_id);
+
 -- Заказчики — справочник для внесения выручки: у каждого заказчика своя
 -- ставка за час работы и за сутки ожидания/дежурства (см. tool_revenue
 -- ниже — при выборе заказчика эти ставки подтягиваются автоматически и

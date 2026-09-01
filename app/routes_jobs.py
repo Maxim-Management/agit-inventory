@@ -6,7 +6,9 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 
 from . import db
 from .auth import login_required, roles_required
-from .jobs import list_jobs, job_totals, job_write_offs, JOB_TYPE_LABELS
+from .jobs import (
+    list_jobs, job_totals, job_write_offs, job_unit_repairs, delete_job as delete_job_core, JOB_TYPE_LABELS,
+)
 from .analytics import REASON_LABELS
 from . import tools as tools_mod
 from .stock import consume_from_batch, open_batches_for_part, batch_label
@@ -95,6 +97,7 @@ def detail(job_id):
         return redirect(url_for("jobs.list_view"))
     job.update(job_totals(job))
     write_offs = job_write_offs(job_id)
+    component_repairs = job_unit_repairs(job_id)
 
     # Единый выбор детали для списания на работу (серийная или несерийная —
     # см. шаблон: один выпадающий список на обе группы). Для несерийных
@@ -130,9 +133,10 @@ def detail(job_id):
     tool_list = db.query_all("SELECT id, serial_number, tool_size FROM tools ORDER BY serial_number")
 
     return render_template(
-        "jobs/detail.html", job=job, write_offs=write_offs, reason_labels=REASON_LABELS,
-        job_type_labels=JOB_TYPE_LABELS, bulk_parts=bulk_parts, serialized_parts=serialized_parts,
-        batches_by_part_json=batches_by_part_json, units_by_part_json=units_by_part_json, tools=tool_list,
+        "jobs/detail.html", job=job, write_offs=write_offs, component_repairs=component_repairs,
+        reason_labels=REASON_LABELS, job_type_labels=JOB_TYPE_LABELS, bulk_parts=bulk_parts,
+        serialized_parts=serialized_parts, batches_by_part_json=batches_by_part_json,
+        units_by_part_json=units_by_part_json, tools=tool_list,
     )
 
 
@@ -172,25 +176,7 @@ def delete_job(job_id):
     if not job:
         flash("Работа не найдена.", "error")
         return redirect(url_for("jobs.list_view"))
-    # Удаление работы отменяет и её списания: компонент возвращается на
-    # склад (серийный — статус обратно 'in_stock'; расходник — остаток
-    # партии-источника увеличивается обратно), сами записи списания удаляются.
-    restored = 0
-    write_offs = db.query_all("SELECT * FROM write_offs WHERE job_id = %s", [job_id])
-    for w in write_offs:
-        if w["unit_id"]:
-            db.execute(
-                "UPDATE units SET status = 'in_stock', installed_on_tool_id = NULL, installed_on = '' WHERE id = %s",
-                [w["unit_id"]],
-            )
-        if w["receipt_id"]:
-            db.execute(
-                "UPDATE receipts SET remaining_quantity = remaining_quantity + %s WHERE id = %s",
-                [w["quantity"], w["receipt_id"]],
-            )
-        db.execute("DELETE FROM write_offs WHERE id = %s", [w["id"]])
-        restored += 1
-    db.execute("DELETE FROM service_jobs WHERE id = %s", [job_id])
+    restored = delete_job_core(job_id)
     msg = "Работа удалена."
     if restored:
         msg += f" Списанные на неё компоненты ({restored}) возвращены на склад."
@@ -298,6 +284,7 @@ def report():
     totals = {
         "jobs_count": len(jobs),
         "parts_cost": round(sum(j["parts_cost"] for j in jobs), 2),
+        "component_repairs_cost": round(sum(j["component_repairs_cost"] for j in jobs), 2),
         "service_center_cost": round(sum(j["service_center_cost"] for j in jobs), 2),
         "labor_cost": round(sum(j["labor_cost"] for j in jobs), 2),
         "other_cost": round(sum(j["other_cost"] for j in jobs), 2),
@@ -327,12 +314,13 @@ def export_report_csv():
 
     buf = io.StringIO()
     writer = csv.writer(buf)
-    writer.writerow(["Дата", "Тип", "Сборка", "Название", "Стоимость деталей, RUB",
+    writer.writerow(["Дата", "Тип", "Сборка", "Название", "Стоимость деталей, RUB", "Ремонт компонентов, RUB",
                       "Сервисный центр, RUB", "Персонал, RUB", "Прочее, RUB", "Итого, RUB"])
     for j in jobs:
         writer.writerow([
             j["job_date"], JOB_TYPE_LABELS.get(j["job_type"], j["job_type"]), j["tool_assembly"], j["title"],
-            j["parts_cost"], j["service_center_cost"], j["labor_cost"], j["other_cost"], j["total_cost"],
+            j["parts_cost"], j["component_repairs_cost"], j["service_center_cost"], j["labor_cost"],
+            j["other_cost"], j["total_cost"],
         ])
 
     return Response(

@@ -55,18 +55,69 @@ def job_parts_cost(job_id):
     return {"parts_cost": round(total, 2), "priced_lines": priced, "unpriced_lines": unpriced}
 
 
+def job_unit_repairs(job_id):
+    """Ремонты серийных компонентов, отнесённые на эту работу (см.
+    app/routes_units.py: repair()) — при выборе работы стоимость ремонта
+    компонента ложится в стоимость этой работы, а сам компонент
+    устанавливается на инструмент работы."""
+    return db.query_all(
+        """SELECT ur.*, u.serial_number, p.part_name, p.part_number
+           FROM unit_repairs ur
+           JOIN units u ON u.id = ur.unit_id
+           JOIN parts p ON p.id = u.part_id
+           WHERE ur.job_id = %s
+           ORDER BY ur.repair_date DESC, ur.id DESC""",
+        [job_id],
+    )
+
+
+def job_unit_repairs_cost(job_id):
+    row = db.query_one("SELECT COALESCE(SUM(cost_rub),0) AS s FROM unit_repairs WHERE job_id = %s", [job_id])
+    return round(float(row["s"] or 0), 2)
+
+
 def job_totals(job):
     parts_cost = job_parts_cost(job["id"])["parts_cost"]
     service = float(job["service_center_cost"] or 0)
     labor = float(job["labor_cost"] or 0)
     other = float(job["other_cost"] or 0)
+    component_repairs_cost = job_unit_repairs_cost(job["id"])
     return {
         "parts_cost": parts_cost,
         "service_center_cost": service,
         "labor_cost": labor,
         "other_cost": other,
-        "total_cost": round(parts_cost + service + labor + other, 2),
+        "component_repairs_cost": component_repairs_cost,
+        "total_cost": round(parts_cost + service + labor + other + component_repairs_cost, 2),
     }
+
+
+def delete_job(job_id):
+    """Удаляет работу целиком: списанные на неё компоненты возвращаются на
+    склад (записи списания удаляются, партии — пополняются). Записи о
+    ремонте серийных компонентов (unit_repairs), отнесённые на эту работу,
+    НЕ удаляются — история ремонта конкретного компонента ценна сама по
+    себе, — а просто отвязываются от работы (job_id -> NULL), переставая
+    учитываться в стоимости удаляемой работы. Возвращает число возвращённых
+    на склад списаний."""
+    restored = 0
+    write_offs = db.query_all("SELECT * FROM write_offs WHERE job_id = %s", [job_id])
+    for w in write_offs:
+        if w["unit_id"]:
+            db.execute(
+                "UPDATE units SET status = 'in_stock', installed_on_tool_id = NULL, installed_on = '' WHERE id = %s",
+                [w["unit_id"]],
+            )
+        if w["receipt_id"]:
+            db.execute(
+                "UPDATE receipts SET remaining_quantity = remaining_quantity + %s WHERE id = %s",
+                [w["quantity"], w["receipt_id"]],
+            )
+        db.execute("DELETE FROM write_offs WHERE id = %s", [w["id"]])
+        restored += 1
+    db.execute("UPDATE unit_repairs SET job_id = NULL WHERE job_id = %s", [job_id])
+    db.execute("DELETE FROM service_jobs WHERE id = %s", [job_id])
+    return restored
 
 
 def list_jobs(job_type=None, date_from=None, date_to=None, tool_id=None):

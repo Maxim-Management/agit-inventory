@@ -16,6 +16,12 @@
     {% if can_edit %}
     <a href="{{ url_for('tools.edit_tool', tool_id=tool.id) }}" class="bg-slate-100 border border-slate-300 text-sm px-4 py-2 rounded-lg hover:bg-slate-200">Редактировать</a>
     {% endif %}
+    {% if is_admin %}
+    <form method="post" action="{{ url_for('tools.delete_tool', tool_id=tool.id) }}" onsubmit="return confirm('Удалить инструмент {{ tool.serial_number }} безвозвратно? Вместе с ним будут удалены вся его выручка, наработка и ремонтные/сборочные работы (списанные на них компоненты вернутся на склад). Установленные сейчас компоненты будут сняты и возвращены на склад. Отменить это действие нельзя.');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="bg-white border border-red-300 text-red-700 text-sm px-4 py-2 rounded-lg hover:bg-red-50">Удалить инструмент</button>
+    </form>
+    {% endif %}
   </div>
 </div>
 
@@ -65,6 +71,8 @@
               <input type="hidden" name="unit_id" value="{{ u.id }}">
               <button class="text-slate-600 hover:underline text-xs">На склад</button>
             </form>
+            <span class="text-slate-300 mx-1">·</span>
+            <a href="{{ url_for('units.repair', unit_id=u.id) }}" class="text-blue-700 hover:underline text-xs" title="Записать ремонт этого компонента и отнести его стоимость на работу">Ремонт</a>
             <span class="text-slate-300 mx-1">·</span>
             <a href="{{ url_for('units.writeoff', unit_id=u.id) }}" class="text-red-700 hover:underline text-xs" title="Компонент повреждён, изношен или непригоден к дальнейшей эксплуатации">Списать</a>
             {% endif %}
